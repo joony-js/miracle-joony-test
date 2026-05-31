@@ -256,7 +256,6 @@
 <div class="nav">
     <button id="nav-home"  class="nav-item active" onclick="showTab('home')">🏠 홈</button>
     <button id="nav-cal"   class="nav-item" onclick="showTab('cal')">📅 달력</button>
-    <button id="nav-rank"  class="nav-item" onclick="showTab('rank')">🏆 랭킹</button>
     <button id="nav-admin" class="nav-item" onclick="showTab('admin')">👑 관리자</button>
 </div>
 
@@ -302,6 +301,25 @@
                 <div id="routine-list"></div>
                 <div class="footer-note">📢 자유일에도 실천하면 ⭐로 기록해 주세요!</div>
             </div>
+
+            <!-- 나의 배지 (홈 하단) -->
+            <div class="card" id="home-badge-card" style="display:none;">
+                <div class="card-title">🎖 나의 배지</div>
+                <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">달성 조건과 현재 진행도를 확인하세요</div>
+                <div id="my-badge-area"></div>
+            </div>
+
+            <!-- 이번 달 성취율 TOP 5 (홈 하단) -->
+            <div class="card">
+                <div class="card-title">🏅 이번 달 성취율 TOP 5</div>
+                <div id="rank-rate-list"></div>
+            </div>
+
+            <!-- 연속 기록 TOP 3 (홈 하단) -->
+            <div class="card">
+                <div class="card-title">🔥 연속 기록 TOP 3</div>
+                <div id="rank-streak-list"></div>
+            </div>
         </div>
     </div>
 
@@ -326,24 +344,6 @@
         </div>
     </div>
 
-    <!-- RANKING — 순서: 배지 → 성취율 → 연속 -->
-    <div id="sec-rank" style="display:none;">
-        <div class="card">
-            <div class="card-title">🎖 나의 배지</div>
-            <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">달성 조건과 현재 진행도를 확인하세요</div>
-            <div id="my-badge-area">
-                <div style="text-align:center;color:#b0a890;font-size:14px;padding:18px;">홈에서 이름을 선택해 주세요</div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-title">🏅 이번 달 성취율 TOP 5</div>
-            <div id="rank-rate-list"></div>
-        </div>
-        <div class="card">
-            <div class="card-title">🔥 연속 기록 TOP 3</div>
-            <div id="rank-streak-list"></div>
-        </div>
-    </div>
 
     <!-- ADMIN -->
     <div id="sec-admin" style="display:none;">
@@ -854,6 +854,10 @@ function loadUser(){
     renderBadges(name);
     autoSaveFreeDay(name);
     if(name!=="사랑주니") updateMyRank(name);
+    // 홈 하단 배지·랭킹 카드 노출 + 갱신
+    const badgeCard=document.getElementById('home-badge-card');
+    if(badgeCard) badgeCard.style.display='block';
+    renderRanking();
 }
 
 function checkMissingAlert(name){
@@ -1109,7 +1113,7 @@ function renderGrid(name){
     const hint=document.getElementById('cal-empty-hint');
     const hdr=document.getElementById('cal-grid-header');
 
-    // ④ 이름 없으면 안내 문구만 표시
+    // 이름 없으면 안내 문구만 표시, 헤더/달력 숨김
     if(!name){
         lbl.style.display='none';
         hint.style.display='block';
@@ -1117,8 +1121,9 @@ function renderGrid(name){
         grid.innerHTML='';
         return;
     }
+    // 이름 있으면 항상 헤더·달력 표시, 안내 숨김
     hint.style.display='none';
-    hdr.style.display='grid';
+    hdr.style.display='grid'; // 버그 수정: 초기 진입 시 display:none 상태 해제
     lbl.style.display='block';
     lbl.innerText='📅 '+name+'님의 '+MONTH_CONFIG[calMonth].label+' 달력';
 
@@ -1313,9 +1318,17 @@ function showTab(tab){
         if(!adminAuthed){ const pw=prompt("관리자 비밀번호를 입력하세요"); if(pw!==ADMIN_PW){ showToast("비밀번호가 틀렸습니다."); return; } adminAuthed=true; }
         renderAdmin();
     }
-    if(tab==='rank'){ renderRanking(); if(currentUser) renderBadges(currentUser); }
-    if(tab==='cal'){ updateCalNavButtons(); renderGrid(currentUser); }
-    ['home','cal','rank','admin'].forEach(t=>{
+    if(tab==='cal'){
+        // calMonth가 currentUser의 joinMonth보다 작으면 보정
+        if(currentUser){
+            const joinM=getMemberJoinMonth(currentUser);
+            if(calMonth < joinM) calMonth=joinM;
+        }
+        updateCalNavButtons();
+        renderGrid(currentUser);
+    }
+    // 랭킹 탭 제거 — 홈 탭으로 이동됨
+    ['home','cal','admin'].forEach(t=>{
         document.getElementById('sec-'+t).style.display=t===tab?'block':'none';
         document.getElementById('nav-'+t).className='nav-item'+(t===tab?' active':'');
     });
