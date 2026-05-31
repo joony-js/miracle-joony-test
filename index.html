@@ -1,94 +1,1098 @@
-// =============================================
-// 미라클 주니 21기 — Google Apps Script
-// =============================================
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>미라클 주니 통합센터</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --navy:       #2C3E6B;
+            --navy2:      #374a80;
+            --navy-dark:  #1e2b4e;
+            --gold:       #F1C40F;
+            --gold2:      #f5d130;
+            --gold-light: #fdf6d3;
+            --gold-dim:   #c9a40c;
+            --cream:      #faf8f2;
+            --cream2:     #f4f0e4;
+            --ok:         #219150;
+            --ok-light:   #d5f5e3;
+            --no:         #c0392b;
+            --no-light:   #fadbd8;
+            --etc:        #7f8c8d;
+            --card:       #ffffff;
+            --border:     #e4dfcc;
+            --text:       #1e2b4e;
+            --text-sub:   #7a7560;
+            --radius:     16px;
+            --shadow:     0 4px 20px rgba(44,62,107,0.10);
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background: var(--cream); margin: 0; color: var(--text); }
 
-const SS = SpreadsheetApp.getActiveSpreadsheet();
+        /* LOADING */
+        #loading-overlay { position:fixed;inset:0;background:var(--navy-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s; }
+        .loading-spinner { width:52px;height:52px;border:4px solid rgba(241,196,15,0.2);border-top:4px solid var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:18px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .loading-text  { font-size:16px;font-weight:900;color:var(--gold);letter-spacing:1.5px; }
+        .loading-sub   { font-size:12px;color:rgba(255,255,255,0.45);margin-top:7px; }
+        .loading-stars { font-size:20px;margin-bottom:14px;letter-spacing:5px;color:var(--gold); }
 
-// ▶ POST 요청 처리 (기록 저장)
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const sheet = SS.getSheetByName("기록");
-    sheet.appendRow([data.date, data.name, data.routine, data.status]);
-    return ContentService
-      .createTextOutput(JSON.stringify({ result: "success" }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ result: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+        /* HEADER */
+        .header { background:var(--navy-dark);color:var(--gold);padding:13px 16px;text-align:center;font-weight:900;font-size:15px;position:sticky;top:0;z-index:1000;letter-spacing:1.5px;border-bottom:1.5px solid rgba(241,196,15,0.22); }
+        .header-sub { font-size:11px;color:rgba(241,196,15,0.55);font-weight:600;margin-top:2px;letter-spacing:0; }
+
+        /* ALERT */
+        #missing-alert { background:#fff8e1;border:1.5px solid var(--gold);color:#7a5800;margin:10px 14px 0;padding:11px;border-radius:12px;font-size:13px;font-weight:800;text-align:center;display:none; }
+
+        /* QUOTE */
+        .quote-area { background:var(--navy);border-radius:var(--radius);margin:13px 14px 0;padding:20px 18px;text-align:center;position:relative;overflow:hidden; }
+        .quote-area::before,.quote-area::after { content:'✦';position:absolute;font-size:13px;color:rgba(241,196,15,0.25); }
+        .quote-area::before { top:10px;left:14px; }
+        .quote-area::after  { bottom:10px;right:14px; }
+        .quote-text   { font-size:15px;font-weight:900;color:#fff;word-break:keep-all;line-height:1.65; }
+        .quote-author { font-size:13px;color:var(--gold);margin-top:9px;font-weight:700; }
+        .current-date { font-size:12px;color:rgba(255,255,255,0.4);margin-top:5px;font-weight:600; }
+
+        /* NAV */
+        .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;top:50px;z-index:900; }
+        .nav-item { flex:1;padding:12px 4px;text-align:center;font-weight:800;border-radius:10px 10px 0 0;background:var(--cream2);color:#aaa;border:none;font-size:12px;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s; }
+        .nav-item.active { background:var(--card);color:var(--navy);border-bottom:3px solid var(--gold); }
+
+        .content { padding:14px; }
+
+        /* CARD */
+        .card { background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px;border:1px solid var(--border);box-shadow:var(--shadow); }
+        .card-title { font-weight:900;font-size:15px;margin-bottom:12px;color:var(--navy); }
+
+        /* SELECT */
+        .select-box { width:100%;padding:15px;font-size:17px;font-weight:800;border:2px solid var(--navy);border-radius:13px;margin-bottom:12px;background:var(--card);color:var(--text);cursor:pointer; }
+
+        /* DATE CHIPS */
+        .date-selector { display:flex;gap:7px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none; }
+        .date-selector::-webkit-scrollbar { display:none; }
+        .date-chip { flex-shrink:0;padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.2s;color:var(--text); }
+        .date-chip.active { background:var(--navy);color:var(--gold);border-color:var(--navy); }
+
+        /* TODAY SUMMARY */
+        .today-summary { background:var(--navy);border-radius:var(--radius);padding:17px 16px;margin-bottom:14px; }
+        .today-label { font-size:13px;font-weight:700;color:rgba(255,255,255,0.65); }
+        .today-count { font-size:36px;font-weight:900;color:var(--gold);line-height:1.1;margin:4px 0 8px; }
+        .today-names { display:flex;flex-wrap:wrap;gap:6px; }
+        .today-name-chip { background:rgba(241,196,15,0.14);color:var(--gold);padding:5px 10px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid rgba(241,196,15,0.28); }
+
+        /* ③ 순위 한 줄 */
+        .my-rank-line { font-size:13px;font-weight:800;color:rgba(255,255,255,0.8);margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.2); }
+        .my-rank-line span { color:var(--gold); }
+
+        /* USER AREA */
+        .welcome-text { font-size:20px;font-weight:900;margin-bottom:11px;color:var(--navy); }
+        .stat-row { display:flex;gap:8px;margin-bottom:12px; }
+        .stat-box { flex:1;background:var(--navy);border-radius:13px;padding:12px 6px;text-align:center; }
+        .stat-val { font-size:22px;font-weight:900;color:var(--gold); }
+        .stat-lbl { font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);margin-top:3px; }
+
+        .praise-text { text-align:center;font-size:15px;font-weight:900;padding:11px;border-radius:12px;margin-bottom:12px;background:var(--gold-light);border:1.5px solid var(--gold);color:var(--navy); }
+
+        /* ② STREAK MINI */
+        .streak-mini { background:var(--navy);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;border:1px solid rgba(241,196,15,0.18); }
+        .streak-main-line { font-size:18px;font-weight:900;color:var(--gold);margin-bottom:2px; }
+        .streak-sub-line  { font-size:13px;color:rgba(255,255,255,0.55);font-weight:700; }
+
+        /* PREV MONTH BTN */
+        .prev-month-btn { width:100%;padding:12px;border-radius:13px;border:2px dashed var(--border);background:var(--card);font-size:14px;font-weight:800;color:var(--text-sub);cursor:pointer;margin-bottom:13px;transition:all 0.2s; }
+        .prev-month-btn.active { border-style:solid;border-color:var(--navy);color:var(--navy);background:var(--gold-light); }
+
+        /* ROUTINE ITEMS */
+        .item { display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede4; }
+        .item-name { font-size:16px;font-weight:700;flex:1;color:var(--text); }
+        .item-badge { font-size:11px;background:var(--gold-light);color:#7a5800;padding:2px 7px;border-radius:8px;margin-left:6px;font-weight:700;border:1px solid rgba(241,196,15,0.35); }
+        .btn-group { display:flex;gap:6px; }
+        .btn { width:48px;height:48px;border-radius:12px;border:2px solid #e0ddd2;font-weight:900;font-size:16px;background:#fff;color:#c0bdb0;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center; }
+        .btn.O.active { background:var(--ok);color:#fff;border-color:var(--ok);transform:scale(1.07);animation:celebrate 0.4s ease; }
+        .btn.X.active { background:var(--no);color:#fff;border-color:var(--no); }
+        .btn.P.active { background:var(--etc);color:#fff;border-color:var(--etc); }
+        .btn-auto-pass { background:#f0ede4!important;color:#a09880!important;font-size:12px!important;cursor:default;width:auto!important;padding:0 11px;border-color:#dedad0!important;height:40px!important;border-radius:10px!important; }
+        .btn-volunteer-star { font-size:20px!important;border-color:rgba(241,196,15,0.45)!important;color:var(--gold-dim)!important; }
+        .btn-volunteer-star.active { background:var(--gold)!important;color:var(--navy)!important;border-color:var(--gold)!important; }
+        @keyframes celebrate { 0%{transform:scale(1)}30%{transform:scale(1.3) rotate(-5deg)}60%{transform:scale(1.15) rotate(3deg)}100%{transform:scale(1.07)} }
+
+        /* CONFETTI */
+        .confetti-wrap { position:fixed;inset:0;pointer-events:none;z-index:5000;overflow:hidden; }
+        .confetti-piece { position:absolute;width:10px;height:10px;border-radius:2px;animation:confettiFall 1.3s ease-in forwards; }
+        @keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+
+        /* CALENDAR */
+        .cal-nav { display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px; }
+        .cal-nav-btn { width:36px;height:36px;border-radius:50%;border:2px solid var(--navy);background:var(--card);color:var(--navy);font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s; }
+        .cal-nav-btn:hover { background:var(--navy);color:var(--gold); }
+        .cal-nav-btn:disabled { border-color:#ddd;color:#ccc;cursor:default; }
+        .cal-nav-btn:disabled:hover { background:var(--card);color:#ccc; }
+        .cal-month-label { font-size:17px;font-weight:900;color:var(--navy);min-width:90px;text-align:center; }
+        .cal-member-label { text-align:center;font-size:14px;font-weight:900;color:var(--navy);margin-bottom:11px;padding:9px;background:var(--gold-light);border-radius:10px;border:1px solid rgba(241,196,15,0.35); }
+        .grid-header { display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:12px;font-weight:900;margin-bottom:6px; }
+        .grid-container { display:grid;grid-template-columns:repeat(7,1fr);gap:4px; }
+        .day-cell { min-height:54px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:1.5px solid #e8e2cc;background:#fff;cursor:pointer;line-height:1.3;transition:all 0.15s;padding:3px 2px;color:var(--text); }
+        .day-cell:hover { transform:scale(1.05);z-index:2; }
+        .day-cell.sun { color:#c0392b;background:#fdf5f5; }
+        .day-cell.sat { color:#2471a3;background:#f0f6fc; }
+        .day-cell.holiday { color:#c0392b; }
+        .day-cell.selected { border:2.5px solid var(--navy); }
+        .day-cell.today-mark { box-shadow:0 0 0 2.5px var(--gold); }
+        .day-cell .streak-dot { width:6px;height:6px;background:var(--gold);border-radius:50%;margin-top:2px; }
+
+        /* RANKING */
+        .rank-card { background:var(--card);border-radius:var(--radius);padding:13px 15px;margin-bottom:9px;border:1px solid var(--border);display:flex;align-items:center;gap:12px; }
+        .rank-num { font-size:22px;font-weight:900;width:36px;text-align:center; }
+        .rank-1 { color:var(--gold); } .rank-2 { color:#a0a0a0; } .rank-3 { color:#b87040; }
+        .rank-info { flex:1; }
+        .rank-name { font-size:17px;font-weight:900;color:var(--navy); }
+        .rank-val  { font-size:13px;color:var(--text-sub);font-weight:700;margin-top:2px; }
+        .rank-bar-wrap { height:7px;background:var(--cream2);border-radius:4px;margin-top:6px; }
+        .rank-bar { height:7px;background:linear-gradient(90deg,var(--navy),var(--gold));border-radius:4px;transition:width 0.7s ease; }
+
+        /* ⑤ BADGES */
+        .badge-grid { display:flex;flex-wrap:wrap;gap:9px; }
+        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1.5px solid var(--border);border-radius:14px;padding:13px 8px;text-align:center;flex:1;min-width:70px;max-width:105px; }
+        .badge.earned { background:var(--navy);border-color:var(--gold);box-shadow:0 0 12px rgba(241,196,15,0.32); }
+        .badge-icon  { font-size:26px;margin-bottom:4px; }
+        .badge-label { font-size:12px;font-weight:900;color:var(--text); }
+        .badge.earned .badge-label { color:var(--gold); }
+        .badge-cond  { font-size:10px;color:var(--text-sub);margin-top:3px;line-height:1.3; }
+        .badge.earned .badge-cond  { color:rgba(241,196,15,0.65); }
+        .badge-prog  { font-size:10px;font-weight:700;color:var(--text-sub);margin-top:4px; }
+        .badge.earned .badge-prog  { color:var(--gold);font-weight:900; }
+
+        /* ADMIN */
+        .admin-controls { display:flex;gap:8px;margin-bottom:13px;flex-wrap:wrap; }
+        .admin-btn { flex:1;min-width:80px;padding:13px 8px;border-radius:12px;border:none;font-weight:800;color:#fff;font-size:13px;cursor:pointer; }
+        .btn-cap { background:linear-gradient(135deg,#4a3a8c,#6c5ce7); }
+        .btn-xls { background:linear-gradient(135deg,#1a6a40,#27ae60); }
+        #admin-table { width:100%;border-collapse:collapse;font-size:11px;text-align:center;background:#fff; }
+        #admin-table th,#admin-table td { border:1px solid #e4dfcc;padding:5px 2px;min-width:26px; }
+        #admin-table th { background:var(--cream2);padding:8px 2px;font-size:10px;color:var(--navy);font-weight:900; }
+        .member-divider { border-top:2px solid var(--navy)!important; }
+        .clickable-cell { cursor:pointer; }
+        .clickable-cell:hover { background:var(--gold-light)!important; }
+        .sun-txt { color:#c0392b; } .sat-txt { color:#2471a3; }
+        .week-col { background:var(--gold-light)!important;font-weight:900!important;font-size:10px!important;color:var(--navy)!important; }
+
+        /* MONTH TOGGLE */
+        .month-toggle { display:flex;gap:8px;margin-bottom:12px; }
+        .month-btn { flex:1;padding:11px;border-radius:12px;border:2px solid var(--border);background:var(--card);font-size:14px;font-weight:900;color:var(--text-sub);cursor:pointer;transition:all 0.2s;text-align:center; }
+        .month-btn.active { background:var(--navy);color:var(--gold);border-color:var(--navy); }
+
+        /* MISC */
+        .footer-note { font-size:13px;color:var(--text-sub);text-align:center;margin-top:10px;font-weight:700;line-height:1.5; }
+        .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold); }
+
+        #toast { position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
+        @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
+
+        .modal { display:none;position:fixed;z-index:7000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6); }
+        .modal-content { background:#fff;margin:10% auto;padding:20px;border-radius:var(--radius);width:88%;max-width:420px;border-top:4px solid var(--gold); }
+        .modal-header { font-weight:900;font-size:16px;margin-bottom:13px;border-bottom:1px solid #f0ede4;padding-bottom:10px;color:var(--navy); }
+
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-thumb { background:#c8c4b4;border-radius:2px; }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+    <div class="loading-stars">✦ ✦ ✦</div>
+    <div class="loading-spinner"></div>
+    <div class="loading-text">⏱ 미라클 주니 21기</div>
+    <div class="loading-sub">새벽을 깨우는 중...</div>
+</div>
+
+<div class="header">
+    ✦ 미라클 주니 통합센터 ✦
+    <div class="header-sub">21기 · 2026.6.1 ~ 6.30</div>
+</div>
+<div id="missing-alert"></div>
+
+<div class="quote-area">
+    <div class="quote-text" id="quote-text">명언 로딩 중...</div>
+    <div class="quote-author" id="quote-author"></div>
+    <div class="current-date" id="display-date"></div>
+</div>
+
+<div class="nav">
+    <button id="nav-home"  class="nav-item active" onclick="showTab('home')">🏠 홈</button>
+    <button id="nav-cal"   class="nav-item" onclick="showTab('cal')">📅 달력</button>
+    <button id="nav-rank"  class="nav-item" onclick="showTab('rank')">🏆 랭킹</button>
+    <button id="nav-admin" class="nav-item" onclick="showTab('admin')">👑 관리자</button>
+</div>
+
+<div class="content">
+
+    <!-- HOME -->
+    <div id="sec-home">
+        <!-- 오늘 인증 현황 + ③ 순위 -->
+        <div class="today-summary">
+            <div class="today-label">오늘 인증 완료 ✦</div>
+            <div class="today-count" id="today-count">-</div>
+            <div id="today-names" class="today-names"></div>
+            <div class="my-rank-line" id="my-rank-line" style="display:none;">
+                🏅 이번 달 실천 순위: 전체 <span id="rank-total">-</span>명 중 <span id="rank-pos">-</span>위
+            </div>
+        </div>
+
+        <select class="select-box" id="userSelect" onchange="onUserChange()">
+            <option value="">-- 성함을 선택하세요 --</option>
+        </select>
+
+        <button class="prev-month-btn" id="prev-month-btn" onclick="togglePrevMonth()">📂 이전 기록 보기 (5월)</button>
+        <div class="date-selector" id="date-selector"></div>
+
+        <div id="userArea" style="display:none;">
+            <!-- ② 연속 기록 — 경우의 수 분기 -->
+            <div class="streak-mini">
+                <div class="streak-main-line" id="streak-main-line">✨ 오늘 첫 기적을 시작해보세요!</div>
+                <div class="streak-sub-line"  id="streak-sub-line"></div>
+            </div>
+
+            <div class="card">
+                <div class="welcome-text">👋 <span id="span-name"></span>님</div>
+                <div id="personal-note" class="personal-note"></div>
+                <div class="stat-row">
+                    <div class="stat-box"><div class="stat-val" id="stat-rate">0%</div><div class="stat-lbl">성취율</div></div>
+                    <div class="stat-box"><div class="stat-val" id="stat-record">0%</div><div class="stat-lbl">기록률</div></div>
+                    <div class="stat-box"><div class="stat-val" id="stat-pass">0</div><div class="stat-lbl">패스 횟수</div></div>
+                </div>
+                <div id="praise-text" class="praise-text">✦ 오늘도 화이팅!</div>
+                <div id="routine-list"></div>
+                <div class="footer-note">📢 자유일에도 실천하면 ⭐로 기록해 주세요!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div id="sec-cal" style="display:none;">
+        <div class="card">
+            <div class="cal-nav">
+                <button class="cal-nav-btn" id="cal-prev-btn" onclick="changeCalMonth(-1)">&#8249;</button>
+                <div class="cal-month-label" id="cal-month-label">6월</div>
+                <button class="cal-nav-btn" id="cal-next-btn" onclick="changeCalMonth(1)">&#8250;</button>
+            </div>
+            <div id="cal-member-label" class="cal-member-label" style="display:none;"></div>
+            <div class="grid-header">
+                <span style="color:#c0392b">일</span><span>월</span><span>화</span><span>수</span>
+                <span>목</span><span>금</span><span style="color:#2471a3">토</span>
+            </div>
+            <div id="mini-grid" class="grid-container"></div>
+        </div>
+    </div>
+
+    <!-- RANKING ⑥ 순서: 배지 → 성취율 → 연속 -->
+    <div id="sec-rank" style="display:none;">
+        <div class="card">
+            <div class="card-title">🎖 나의 배지</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">달성 조건과 현재 진행도를 확인하세요</div>
+            <div id="my-badge-area">
+                <div style="text-align:center;color:#b0a890;font-size:14px;padding:18px;">홈에서 이름을 선택해 주세요</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">🏅 이번 달 성취율 TOP 5</div>
+            <div id="rank-rate-list"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">🔥 연속 기록 TOP 3</div>
+            <div id="rank-streak-list"></div>
+        </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div id="sec-admin" style="display:none;">
+        <h3 style="margin:0 0 12px 0;font-weight:900;color:var(--navy);text-align:center;font-size:15px;">📊 21기 실시간 통합 현황</h3>
+        <div class="month-toggle" style="margin-bottom:12px;">
+            <button class="month-btn" id="adm-btn-may" onclick="setAdminMonth(5)">5월 기록</button>
+            <button class="month-btn active" id="adm-btn-jun" onclick="setAdminMonth(6)">6월 기록</button>
+        </div>
+        <div class="admin-controls">
+            <button class="admin-btn btn-cap" onclick="capture()">🖼 화면 캡처</button>
+            <button class="admin-btn btn-xls" onclick="exportXls()">📈 엑셀 저장</button>
+        </div>
+        <div id="absence-alert" style="margin-bottom:12px;"></div>
+        <div class="card" id="capture-area" style="overflow:auto;padding:10px;border:2px solid var(--navy);">
+            <table id="admin-table"></table>
+        </div>
+        <div style="font-size:11px;color:var(--text-sub);margin-top:8px;text-align:center;">셀 클릭 시 상태 수정 | 🔥잘함 ⚠️보통 🆘주의 💤미기록</div>
+    </div>
+</div>
+
+<div id="dayModal" class="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header" id="modalDate"></div>
+        <div id="modalBody"></div>
+        <button class="admin-btn btn-cap" style="width:100%;margin-top:13px;" onclick="closeModal()">닫기</button>
+    </div>
+</div>
+<div id="toast"></div>
+<div id="confetti-wrap" class="confetti-wrap"></div>
+
+<script>
+// ============================================================
+// 상수
+// ============================================================
+const API = "https://script.google.com/macros/s/AKfycbzPm7_30HAT87RM60Ii1X1mzGxGp8CljHTvwbHPNACQ_Eq6et-hqVzVhN8p9OD8zwuNpg/exec";
+const ADMIN_PW = "4120";
+
+const MONTH_CONFIG = {
+    5:{ year:2026, monthIdx:4, days:31, str:"2026-05", label:"5월", holidays:["2026-05-05","2026-05-25"] },
+    6:{ year:2026, monthIdx:5, days:30, str:"2026-06", label:"6월", holidays:["2026-06-03","2026-06-06"] }
+};
+const ALL_MONTHS = [5, 6];
+const DAY_NAMES = ['일','월','화','수','목','금','토'];
+
+// ① O 버튼 체크 문구
+const O_CHEERS = [
+    "🎉 완료! 오늘도 기적을 만들고 있어요!",
+    "🔥 이 기세 그대로! 멈추지 마세요!",
+    "⚡ 번쩍! 또 하나 해냈어요!",
+    "🌟 빛나는 순간이에요! 대단해요!",
+    "💪 오늘도 해냈다! 역시 미라클 주니!",
+    "🎊 짝짝짝! 루틴 하나 완성!",
+    "🚀 슝~ 오늘도 성장 중!",
+    "✨ 반짝! 이 순간이 기적이에요!",
+    "😎 �멋있다! 오늘도 실천 완료!",
+    "🌈 좋아요! 조금씩 더 나아지고 있어요!"
+];
+const SAVE_CHEERS = [
+    "소중한 기록 감사합니다. ✦",
+    "'우리'라서 해낼 수 있어요. 끝까지 함께해요! 🤝"
+];
+
+const WEEK_RANGES = {
+    6:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:30} ],
+    5:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:31} ]
+};
+
+// 부분 자유일 — 기상시간 루틴만 자동패스
+const PARTIAL_FREE_ROUTINES = {
+    "곰돌": ["기상시간 5시"]
+};
+
+// ⑤ 배지 정의
+const BADGE_STREAK = [
+    { icon:'🌱', label:'새싹',  days:3,  cond:'3일 연속 완수'  },
+    { icon:'🌿', label:'성장',  days:7,  cond:'7일 연속 완수'  },
+    { icon:'⚡', label:'도약',  days:10, cond:'10일 연속 완수' },
+    { icon:'🌸', label:'결실',  days:20, cond:'20일 연속 완수' },
+    { icon:'🔥', label:'불꽃',  days:30, cond:'30일 연속 완수' },
+];
+const BADGE_RATE = [
+    { icon:'💎', label:'꾸준한 실천가', threshold:80, cond:'이번 달 성취율 80%+' },
+    { icon:'👑', label:'이달의 챔피언', threshold:100, cond:'이번 달 성취율 100%' },
+];
+
+// ============================================================
+// 상태
+// ============================================================
+let db=[], MEMBERS={}, QUOTES={};
+let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
+let viewingPrevMonth=false, calMonth=6, adminMonth=6;
+
+// ============================================================
+// 유틸
+// ============================================================
+function getTodayStr(){ return new Date().toLocaleDateString('sv-SE'); }
+function dateStr(m,d){ return MONTH_CONFIG[m].str+"-"+String(d).padStart(2,'0'); }
+function getDays(m){ return MONTH_CONFIG[m].days; }
+function getHolidays(m){ return MONTH_CONFIG[m].holidays; }
+function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// ============================================================
+// 데이터 로딩
+// ============================================================
+async function loadAllData(){
+    showLoading(true);
+    try {
+        const [mRes,qRes] = await Promise.all([
+            fetch(API+"?type=members&v="+Date.now()).then(r=>r.json()).catch(()=>({result:"error"})),
+            fetch(API+"?type=quotes&v="+Date.now()).then(r=>r.json()).catch(()=>({result:"error"}))
+        ]);
+        if(mRes.result==="success") MEMBERS=mRes.members; else loadFallbackMembers();
+        if(qRes.result==="success") QUOTES=qRes.quotes; else loadFallbackQuotes();
+        await fetchRecords();
+        initUI();
+    } catch(e){ loadFallbackMembers(); loadFallbackQuotes(); await fetchRecords(); initUI(); }
+    finally{ showLoading(false); }
 }
 
-// ▶ GET 요청 처리 (멤버 목록 + 명언 반환)
-function doGet(e) {
-  try {
-    const type = e.parameter.type;
+function fetchRecords(){
+    return fetch(API+"?type=records&v="+Date.now())
+        .then(r=>r.json())
+        .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
+        .catch(()=>{});
+}
 
-    if (type === "members") {
-      return getMembersData();
-    } else if (type === "quotes") {
-      return getQuotesData();
+function showLoading(show){
+    const el=document.getElementById('loading-overlay');
+    el.style.opacity=show?'1':'0';
+    if(!show) setTimeout(()=>el.style.display='none',500);
+}
+
+// ============================================================
+// 폴백 데이터
+// ============================================================
+function loadFallbackMembers(){
+    MEMBERS={
+        "사랑주니":{items:["기상시간 4시","명상&스트레칭","글쓰기","독서","달리기(걷기)"],note:"운영자 루틴",joinMonth:5,personalConfig:{}},
+        "곰돌":{items:["기상시간 5시","필사","새벽기도(독서)","글쓰기"],note:"주말 기상 자유",joinMonth:5,personalConfig:{}},
+        "글터지기":{items:["기상시간 5시","독서","글쓰기","산책 (주3회)","취침시간 10시30분 이전"],note:"일요일 루틴 자유",joinMonth:5,personalConfig:{}},
+        "꿈젤라":{items:["기상시간 6시","독서10분","명상5분+다이어리","취침시간 11시 이전"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "날위한나":{items:["기상시간 6시30분","아침필사","글쓰기","취침시간 11시 이전"],note:"금,토 취침시간 자유",joinMonth:5,personalConfig:{}},
+        "낭만다정":{items:["기상시간 6시","독서(운동or글쓰기)"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "들꽃향기":{items:["글쓰기","독서","스트레칭(걷기)","취침시간 10시30분 이전"],note:"주말 루틴 자유",joinMonth:5,personalConfig:{}},
+        "보름달":{items:["기상시간 5시20분","독서","필사"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "비채꿈":{items:["기상시간 5시30분","독서","필사","경전 읽기","글쓰기"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "사랑초":{items:["기상시간 6시","독서","글쓰기","걷기(수영)"],note:"주말 루틴 자유",joinMonth:5,personalConfig:{}},
+        "써니허니":{items:["기상시간 6시","독서","공부","스트레칭&명상"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "아테네":{items:["기상시간 7시","산책 10분","공부 10분","취침시간 11시 이전"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "앨리스샘":{items:["기상시간 5시","걷기(달리기)","글쓰기(독서)"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "열정부메랑":{items:["기상시간 4시30분","운동(헬스)"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "열정소피아":{items:["기상시간 4시","독서","새벽기도","스트레칭"],note:"없음",joinMonth:5,personalConfig:{}},
+        "오빛다":{items:["기상시간 4시","영어 공부&리딩","독서","필사","걷기"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "오시연":{items:["기상시간 6시","스트레칭&간단한 운동"],note:"없음",joinMonth:5,personalConfig:{}},
+        "윤슬":{items:["기상시간 6시30분","독서","글쓰기"],note:"주말 기상 7시30분",joinMonth:5,personalConfig:{}},
+        "즐거운호호씨":{items:["기상시간 7시","필사","말씀"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "지금사랑":{items:["독서","저녁 7시이전 식사하기","취침시간 11시 이전"],note:"주말 루틴 자유",joinMonth:5,personalConfig:{}},
+        "탈렌트수니":{items:["기상시간 6시","걷기(달리기)","독서","말씀산책","영어공부"],note:"없음",joinMonth:5,personalConfig:{}},
+        "하니오웰":{items:["기상시간 6시","독서","글쓰기"],note:"주말&연휴 루틴 자유",joinMonth:5,personalConfig:{}},
+        "mam 마음":{items:["기상시간 6시","글쓰기","걷기"],note:"없음",joinMonth:5,personalConfig:{}}
+    };
+}
+
+function loadFallbackQuotes(){
+    QUOTES={1:["말하기를 멈추고, 행동하기 시작하라.","월트 디즈니"],2:["오늘보다 나은 나를 꿈꿔라.","공자"],3:["포기하지 않는 한, 기적은 일어난다.","입센"],4:["승리는 가장 끈기 있는 자에게 돌아간다.","나폴레옹"],5:["습관이 당신을 계속하게 한다.","짐 론"],6:["매일매일이 새로운 기회다.","에피쿠로스"],7:["가장 큰 위험은 위험을 감수하지 않는 것이다.","마크 저커버그"],8:["계획 없는 목표는 단지 꿈에 불과하다.","생텍쥐페리"],9:["성공은 열정을 잃지 않고 실패를 거듭하는 능력이다.","윈스턴 처칠"],10:["미래를 예측하는 가장 좋은 방법은 미래를 창조하는 것이다.","피터 드러커"],11:["오늘 할 수 있는 일에 전력을 다하라.","뉴턴"],12:["행동은 모든 성공의 기초가 된다.","피카소"],13:["탁월함은 행위가 아니라 습관이다.","아리스토텔레스"],14:["자신감은 위대한 일의 첫 번째 비결이다.","사무엘 존슨"],15:["끝까지 해보기 전까지는 늘 불가능해 보인다.","넬슨 만델라"],16:["기회는 준비된 자에게만 찾아온다.","루이 파스퇴르"],17:["한 번의 실패가 영원한 실패는 아니다.","F. 스콧 피츠제럴드"],18:["삶이 있는 한 희망은 있다.","키케로"],19:["당신의 가치는 당신의 행동으로 결정된다.","간디"],20:["어제보다 더 나은 내일을 만들어라.","미상"],21:["가장 빛나는 별은 가장 어두운 밤에 뜬다.","미상"],22:["시작이 반이다.","아리스토텔레스"],23:["작은 일에 충실한 것이 위대한 일로 가는 길이다.","마더 테레사"],24:["열정 없이 이루어진 위대한 일은 없다.","랄프 왈도 에머슨"],25:["성공은 매일 반복되는 작은 노력의 합계이다.","로버트 콜리어"],26:["당신이 할 수 있다고 믿든 할 수 없다고 믿든, 믿는 대로 될 것이다.","헨리 포드"],27:["시간은 우리가 가진 가장 소중한 자산이다.","테오프라스트"],28:["꿈을 기록하는 순간, 목표가 된다.","미상"],29:["인내는 쓰지만 그 열매는 달다.","루소"],30:["지금 이 순간이 당신의 인생을 결정한다.","미상"],31:["당신은 이미 기적의 주인공입니다!","미라클 주니"]};
+}
+
+// ============================================================
+// 초기화
+// ============================================================
+function initUI(){
+    const sel=document.getElementById('userSelect');
+    sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
+    Object.keys(MEMBERS).sort((a,b)=>a==="사랑주니"?-1:b==="사랑주니"?1:a.localeCompare(b,'ko'))
+        .forEach(m=>sel.add(new Option(m,m)));
+    const saved=localStorage.getItem('mj_last_user');
+    if(saved&&MEMBERS[saved]){ sel.value=saved; currentUser=saved; }
+    setQuote(); setDisplayDate(); renderDateSelector(); renderTodaySummary();
+    updateCalNavButtons();
+    if(currentUser) loadUser();
+}
+
+function setQuote(){
+    const d=new Date().getDate(), q=QUOTES[d]||QUOTES[1]||["오늘도 새벽을 깨우세요","미라클 주니"];
+    document.getElementById('quote-text').innerText='"'+q[0]+'"';
+    document.getElementById('quote-author').innerText='— '+q[1];
+}
+function setDisplayDate(){
+    let ds=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+    ds=ds.replace(/([가-힣])$/,"($1)");
+    document.getElementById('display-date').innerText=ds;
+}
+
+// ============================================================
+// 가입월 / 달력 월 이동
+// ============================================================
+function getMemberJoinMonth(name){ return MEMBERS[name]?.joinMonth||6; }
+
+function getAvailableMonths(name){
+    if(!name) return [6];
+    const join=getMemberJoinMonth(name);
+    return ALL_MONTHS.filter(m=>m>=join);
+}
+
+function changeCalMonth(delta){
+    const avail=getAvailableMonths(currentUser);
+    const idx=avail.indexOf(calMonth);
+    const ni=idx+delta;
+    if(ni<0||ni>=avail.length) return;
+    calMonth=avail[ni];
+    updateCalNavButtons();
+    renderGrid(currentUser);
+}
+
+function updateCalNavButtons(){
+    const avail=getAvailableMonths(currentUser);
+    const idx=avail.indexOf(calMonth);
+    const pb=document.getElementById('cal-prev-btn');
+    const nb=document.getElementById('cal-next-btn');
+    const lbl=document.getElementById('cal-month-label');
+    if(pb) pb.disabled=(idx<=0);
+    if(nb) nb.disabled=(idx>=avail.length-1);
+    if(lbl) lbl.innerText=MONTH_CONFIG[calMonth]?.label||calMonth+"월";
+}
+
+// ============================================================
+// 이전 달 토글 (홈)
+// ============================================================
+function togglePrevMonth(){
+    viewingPrevMonth=!viewingPrevMonth;
+    const btn=document.getElementById('prev-month-btn');
+    if(viewingPrevMonth){
+        btn.innerText="📂 6월 기록 보기 (현재 기수)"; btn.classList.add('active');
+        selectedDate="2026-05-31";
+    } else {
+        btn.innerText="📂 이전 기록 보기 (5월)"; btn.classList.remove('active');
+        selectedDate=getTodayStr();
+    }
+    renderDateSelector();
+    if(currentUser) loadUser();
+}
+
+// ============================================================
+// 날짜 칩
+// ============================================================
+function renderDateSelector(){
+    const wrap=document.getElementById('date-selector'); wrap.innerHTML='';
+    if(viewingPrevMonth){
+        for(let i=6;i>=0;i--){ const d=new Date(2026,4,31-i); addDateChip(wrap,d.toLocaleDateString('sv-SE'),d.getDate()+"일("+DAY_NAMES[d.getDay()]+")"); }
+    } else {
+        for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toLocaleDateString('sv-SE'); if(!ds.startsWith("2026-06")) continue; addDateChip(wrap,ds,i===0?"오늘("+DAY_NAMES[d.getDay()]+")":(d.getDate()+"일("+DAY_NAMES[d.getDay()]+")")); }
+    }
+}
+function addDateChip(wrap,ds,label){
+    const c=document.createElement('div'); c.className='date-chip'+(ds===selectedDate?' active':''); c.innerText=label;
+    c.onclick=()=>{ selectedDate=ds; renderDateSelector(); if(currentUser) loadUser(); }; wrap.appendChild(c);
+}
+
+// ============================================================
+// 오늘 인증 현황 + ③ 순위
+// ============================================================
+function renderTodaySummary(){
+    const today=getTodayStr();
+    // 사랑주니 완전 제외: 인증 완료 목록 및 전체 인원 모두 제외
+    const memberList=Object.keys(MEMBERS).filter(n=>n!=="사랑주니");
+    const done=memberList.filter(n=>MEMBERS[n].items.some(r=>{ const s=getLatestS(n,today,r); return s==='O'||s==='⭐'; }));
+    document.getElementById('today-count').innerText=done.length+"명 / "+memberList.length+"명";
+    document.getElementById('today-names').innerHTML=done.map(n=>'<span class="today-name-chip">'+n+'</span>').join('');
+
+    // ③ 현재 사용자 순위 표시
+    if(currentUser && currentUser !== "사랑주니"){
+        updateMyRank(currentUser);
+    }
+}
+
+// ③ 순위 계산 & 표시 (운영자 제외)
+function updateMyRank(name){
+    const today=getTodayStr();
+    const rankMembers=Object.keys(MEMBERS).filter(n=>n!=="사랑주니");
+    const rateData=rankMembers.map(n=>{
+        let o=0,x=0;
+        for(let i=1;i<=30;i++){ const ds=dateStr(6,i); if(ds>today) break; MEMBERS[n].items.forEach(r=>{ const s=getLatestS(n,ds,r); if(s==='O'||s==='⭐') o++; if(s==='X') x++; }); }
+        return {name:n, rate:(o+x)>0?Math.round(o/(o+x)*100):0};
+    }).sort((a,b)=>b.rate-a.rate);
+
+    const pos=rateData.findIndex(d=>d.name===name)+1;
+    const total=rateData.length;
+    const rankLine=document.getElementById('my-rank-line');
+    const rankPos=document.getElementById('rank-pos');
+    const rankTotal=document.getElementById('rank-total');
+    if(pos>0){
+        rankLine.style.display='block';
+        rankPos.innerText=pos;
+        rankTotal.innerText=total;
+    } else {
+        rankLine.style.display='none';
+    }
+}
+
+// ============================================================
+// 상태 조회
+// ============================================================
+function getLatestS(name,date,routine){
+    const rows=db.filter(r=>r.name===name&&r.date===date&&r.routine===routine);
+    if(rows.length) return rows[rows.length-1].status;
+    const cfg=MEMBERS[name]?.personalConfig;
+    if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
+    return '';
+}
+
+// 자유일 타입
+function getFreeDayType(name,ds){
+    const note=(MEMBERS[name]?.note||"").toLowerCase();
+    if(note.includes("없음")) return false;
+    const d=new Date(ds).getDay();
+    const allHol=[...MONTH_CONFIG[5].holidays,...MONTH_CONFIG[6].holidays];
+    const isHol=allHol.includes(ds);
+    let isFree=false;
+    if((note.includes("주말&연휴")||note.includes("주말&연휴 루틴 자유"))&&(d===0||d===6||isHol)) isFree=true;
+    else if((note.includes("주말 루틴 자유")||note.includes("주말 기록 자유"))&&(d===0||d===6)) isFree=true;
+    else if(note.includes("일요일 루틴 자유")&&d===0) isFree=true;
+    else if(note.includes("주말 기상")&&(d===0||d===6)) isFree=true;
+    if(!isFree) return false;
+    if(PARTIAL_FREE_ROUTINES[name]) return 'partial';
+    if(note.includes("주말 기상")&&!note.includes("루틴 자유")) return 'info';
+    return 'full';
+}
+
+// ============================================================
+// 사용자 변경
+// ============================================================
+function onUserChange(){
+    const name=document.getElementById('userSelect').value; currentUser=name;
+    if(name){
+        localStorage.setItem('mj_last_user',name);
+        const joinM=getMemberJoinMonth(name);
+        if(calMonth<joinM) calMonth=joinM;
+        updateCalNavButtons();
+        loadUser();
+    } else {
+        document.getElementById('userArea').style.display='none';
+        document.getElementById('my-rank-line').style.display='none';
+    }
+}
+
+// ============================================================
+// 사용자 화면
+// ============================================================
+function loadUser(){
+    const name=currentUser; if(!name||!MEMBERS[name]) return;
+    document.getElementById('userArea').style.display='block';
+    document.getElementById('span-name').innerText=name;
+    document.getElementById('personal-note').innerText="📌 "+name+"님의 개인 수칙: "+(MEMBERS[name].note||"없음");
+    checkMissingAlert(name);
+    calcStats(name);
+    renderRoutineList(name);
+    renderBadges(name);
+    // ④ 자동패스 저장
+    autoSaveFreeDay(name);
+    // ③ 순위 업데이트
+    if(name!=="사랑주니") updateMyRank(name);
+}
+
+function checkMissingAlert(name){
+    const today=getTodayStr(); let miss=0,isYest=false;
+    for(let i=1;i<=30;i++){
+        const ds=dateStr(6,i); if(ds>=today) break;
+        if(MEMBERS[name].items.every(r=>getLatestS(name,ds,r)==='')){ miss++;
+            const y=new Date(); y.setDate(y.getDate()-1); if(ds===y.toLocaleDateString('sv-SE')) isYest=true; }
+    }
+    const el=document.getElementById('missing-alert');
+    if(isYest){ el.style.display='block'; el.innerText=miss>1?"💡 어제 기록이 없습니다! (누락 총 "+miss+"회) 사랑주니님께 문의하세요.":"💡 어제 기록이 없습니다! 사랑주니님께 문의하세요."; }
+    else el.style.display='none';
+}
+
+// ============================================================
+// ④ 자유일 자동패스 → 구글 시트 자동 기록
+// ============================================================
+function autoSaveFreeDay(name){
+    const today=getTodayStr();
+    const freeType=getFreeDayType(name,today);
+    if(!freeType) return; // 자유일 아님
+    const partialList=PARTIAL_FREE_ROUTINES[name]||[];
+    MEMBERS[name].items.forEach(r=>{
+        // 자동패스 대상인지 확인
+        const isAutoPass=(freeType==='full')||(freeType==='partial'&&partialList.includes(r));
+        if(!isAutoPass) return;
+        // 이미 기록이 있으면 덮어쓰지 않음
+        const existing=getLatestS(name,today,r);
+        if(existing!=='') return;
+        // 로컬 + 서버에 패스(-) 자동 저장
+        db.push({date:today,name,routine:r,status:'-'});
+        fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date:today,name,routine:r,status:'-'})});
+    });
+}
+
+// ============================================================
+// ② 연속 기록 — 7가지 경우의 수
+// ============================================================
+function calcStreakInfo(name){
+    const today=getTodayStr();
+    const all=[];
+    for(let i=1;i<=31;i++) all.push(dateStr(5,i));
+    for(let i=1;i<=30;i++) all.push(dateStr(6,i));
+    const pastDates=all.filter(d=>d<today).reverse(); // 어제 이전
+    const todayStatuses=MEMBERS[name].items.map(r=>getLatestS(name,today,r));
+    const todayHasO=todayStatuses.some(s=>s==='O'||s==='⭐');
+    const todayAllX=todayStatuses.every(s=>s==='X'||s==='');
+    const todayOnlyX=todayStatuses.some(s=>s==='X')&&!todayHasO;
+    const todayOnlyP=todayStatuses.some(s=>s==='-')&&!todayHasO&&!todayStatuses.some(s=>s==='X');
+    const todayHasEntry=todayStatuses.some(s=>s!==''&&s!=='BEFORE_START');
+
+    // 완수 연속 (O 있는 날)
+    let completeStreak=0;
+    for(const ds of pastDates){
+        const st=MEMBERS[name].items.map(r=>getLatestS(name,ds,r));
+        const hasO=st.some(s=>s==='O'||s==='⭐');
+        const hasEntry=st.some(s=>s!==''&&s!=='BEFORE_START');
+        if(hasO) completeStreak++;
+        else if(!hasEntry) break;
+        else break; // X나 패스만 있는 날 → 완수 연속 끊김
+    }
+    if(todayHasO) completeStreak++;
+
+    // 기록 연속 (X나 패스 포함)
+    let recordStreak=0;
+    for(const ds of pastDates){
+        const st=MEMBERS[name].items.map(r=>getLatestS(name,ds,r));
+        const hasEntry=st.some(s=>s!==''&&s!=='BEFORE_START');
+        if(hasEntry) recordStreak++;
+        else break;
+    }
+    if(todayHasEntry) recordStreak++;
+
+    // 어제 완수 연속 수
+    let yestCompleteStreak=0;
+    for(const ds of pastDates){
+        const st=MEMBERS[name].items.map(r=>getLatestS(name,ds,r));
+        const hasO=st.some(s=>s==='O'||s==='⭐');
+        const hasEntry=st.some(s=>s!==''&&s!=='BEFORE_START');
+        if(hasO) yestCompleteStreak++;
+        else if(!hasEntry) break;
+        else break;
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ result: "error", message: "type 파라미터 필요" }))
-      .setMimeType(ContentService.MimeType.JSON);
-
-  } catch(err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ result: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
+    return { completeStreak, recordStreak, yestCompleteStreak, todayHasO, todayHasEntry, todayOnlyX, todayOnlyP };
 }
 
-// ▶ 멤버 시트 읽기
-function getMembersData() {
-  const sheet = SS.getSheetByName("멤버");
-  const rows = sheet.getDataRange().getValues();
-  const members = {};
+function renderStreakMini(name){
+    const info=calcStreakInfo(name);
+    const mainEl=document.getElementById('streak-main-line');
+    const subEl=document.getElementById('streak-sub-line');
 
-  rows.forEach((row, idx) => {
-    if (idx === 0) return; // 헤더 스킵
-    const name = row[0];
-    if (!name) return;
+    let main='', sub='';
 
-    const items = String(row[1]).split("|").map(s => s.trim()).filter(Boolean);
-    const note  = String(row[2]).trim() || "없음";
-
-    // D열: 추가루틴시작일 파싱 (예: "영어공부:2026-06-01|말씀:2026-06-10")
-    const configRaw = String(row[3]).trim();
-    const personalConfig = {};
-    if (configRaw) {
-      configRaw.split("|").forEach(pair => {
-        const [routine, startDate] = pair.split(":").map(s => s.trim());
-        if (routine && startDate) personalConfig[routine] = startDate;
-      });
+    if(!info.todayHasEntry && info.completeStreak===0 && info.recordStreak===0){
+        // 경우 7: 첫 기록 (아무 기록 없음)
+        main='✨ 오늘 첫 기적을 시작해보세요!';
+        sub='';
+    } else if(info.todayHasO){
+        // 경우 1: 오늘 완수 O 있음
+        main='🔥 '+info.completeStreak+'일째 기적 진행 중!';
+        sub='O가 포함된 날을 연속으로 이어가고 있어요';
+    } else if(!info.todayHasEntry && info.yestCompleteStreak>0){
+        // 경우 3: 오늘 미기록, 어제까지 완수 연속
+        main='⚠️ 오늘 기록하면 '+(info.yestCompleteStreak+1)+'일째 기적이 이어져요!';
+        sub='아직 오늘 기록이 없어요. 지금 시작해보세요!';
+    } else if(!info.todayHasEntry && info.yestCompleteStreak===0 && info.recordStreak>0){
+        // 경우 6: 완수 연속이 끊긴 직후
+        main='💪 어제 연속이 끊겼어요. 오늘 다시 1일째!';
+        sub='새로운 시작이 기적의 첫 걸음이에요';
+    } else if(info.todayOnlyP){
+        // 경우 4: 패스만
+        main='☕ 오늘은 충전의 날!';
+        sub=info.recordStreak>0?info.recordStreak+'일째 꾸준히 기록 중이에요':'';
+    } else if(info.todayOnlyX){
+        // 경우 5: X만
+        main='🌱 괜찮아요, 내일 다시 시작해요!';
+        sub='도전하는 것만으로 이미 대단해요';
+    } else if(info.recordStreak>0){
+        // 경우 2: 기록만 연속 (X/패스 섞임)
+        main='📝 '+info.recordStreak+'일째 꾸준히 기록 중!';
+        sub='기록하는 습관이 기적의 시작이에요';
+    } else {
+        main='✦ 오늘도 화이팅!'; sub='';
     }
 
-    members[name] = { items, note, personalConfig };
-  });
-
-  return ContentService
-    .createTextOutput(JSON.stringify({ result: "success", members }))
-    .setMimeType(ContentService.MimeType.JSON);
+    mainEl.innerText=main;
+    subEl.innerText=sub;
 }
 
-// ▶ 명언 시트 읽기
-function getQuotesData() {
-  const sheet = SS.getSheetByName("명언");
-  const rows = sheet.getDataRange().getValues();
-  const quotes = {};
+// ============================================================
+// 통계
+// ============================================================
+function calcStats(name){
+    const today=getTodayStr(), m=viewingPrevMonth?5:6, days=getDays(m);
+    let O=0,X=0,P=0,recDays=0;
+    for(let i=1;i<=days;i++){
+        const ds=dateStr(m,i); if(ds>today) break;
+        let hasEntry=false;
+        MEMBERS[name].items.forEach(r=>{
+            const s=getLatestS(name,ds,r); if(s==='BEFORE_START') return;
+            if(s==='O'||s==='⭐'){O++;hasEntry=true;}
+            if(s==='X'){X++;hasEntry=true;}
+            if(s==='-'){P++;hasEntry=true;}
+        });
+        if(hasEntry) recDays++;
+    }
+    const rate=(O+X)>0?Math.round(O/(O+X)*100):0;
+    const todayDay=Math.min(new Date(today).getDate(),days);
+    const recRate=todayDay>0?Math.round(recDays/todayDay*100):0;
 
-  rows.forEach((row, idx) => {
-    if (idx === 0) return; // 헤더 스킵
-    const day   = Number(row[0]);
-    const text  = String(row[1]).trim();
-    const author = String(row[2]).trim();
-    if (day && text) quotes[day] = [text, author];
-  });
+    document.getElementById('stat-rate').innerText=rate+'%';
+    document.getElementById('stat-record').innerText=recRate+'%';
+    document.getElementById('stat-pass').innerText=P;
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ result: "success", quotes }))
-    .setMimeType(ContentService.MimeType.JSON);
+    const p=document.getElementById('praise-text');
+    if(rate===100) p.innerText="🏆 완벽한 하루! 전설이 되고 있어요!";
+    else if(rate>=80) p.innerText="🔥 오늘도 굉장해요! 이 기세 그대로!";
+    else if(rate>=60) p.innerText="👍 잘 하고 있어요! 조금만 더!";
+    else if(rate>0) p.innerText="🌱 괜찮아요, 오늘도 시작한 것만으로 충분해요";
+    else p.innerText="✦ 오늘의 기록을 시작해보세요!";
+
+    // ② 연속 기록 렌더
+    renderStreakMini(name);
 }
+
+// 연속 완수 일수 (배지/랭킹용)
+function calcStreak(name){
+    const today=getTodayStr(); let streak=0;
+    const all=[];
+    for(let i=1;i<=31;i++) all.push(dateStr(5,i));
+    for(let i=1;i<=30;i++) all.push(dateStr(6,i));
+    for(const ds of all.filter(d=>d<=today).reverse()){
+        const st=MEMBERS[name].items.map(r=>getLatestS(name,ds,r));
+        const hasO=st.some(s=>s==='O'||s==='⭐');
+        const hasEntry=st.some(s=>s!==''&&s!=='BEFORE_START');
+        if(!hasEntry){ if(ds<today) break; }
+        else if(hasO) streak++;
+        else break;
+    }
+    return streak;
+}
+
+// ============================================================
+// 루틴 리스트
+// ============================================================
+function renderRoutineList(name){
+    const items=MEMBERS[name].items;
+    const freeType=getFreeDayType(name,selectedDate);
+    const partialList=PARTIAL_FREE_ROUTINES[name]||[];
+    let html='';
+    items.forEach(r=>{
+        const s=getLatestS(name,selectedDate,r);
+        if(s==='BEFORE_START'){ html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">시작 전</span></span></div>`; return; }
+        if(freeType==='full'){
+            const isVol=s==='⭐';
+            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">자유일</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn btn-volunteer-star ${isVol?'active':''}" onclick="save('${name}','${r}','${isVol?'':'⭐'}')">⭐</button></div></div>`;
+        } else if(freeType==='partial'&&partialList.includes(r)){
+            const isVol=s==='⭐';
+            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">기상 자유</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn btn-volunteer-star ${isVol?'active':''}" onclick="save('${name}','${r}','${isVol?'':'⭐'}')">⭐</button></div></div>`;
+        } else if(freeType==='info'&&r.startsWith('기상시간')){
+            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">주말 기상 자유</span></span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
+        } else {
+            html+=`<div class="item"><span class="item-name">${r}</span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
+        }
+    });
+    document.getElementById('routine-list').innerHTML=html;
+}
+
+// ============================================================
+// 저장 — ① O 버튼 문구 분기
+// ============================================================
+async function save(name,routine,status){
+    db=db.filter(r=>!(r.name===name&&r.date===selectedDate&&r.routine===routine));
+    if(status!=='') db.push({date:selectedDate,name,routine,status});
+    loadUser(); renderTodaySummary();
+    // ① O 체크 시 전용 문구
+    if(status==='O') { showConfetti(); showToast(randItem(O_CHEERS)); }
+    else if(status==='⭐') { showConfetti(); showToast("⭐ 자유일에도 실천! 대단해요!"); }
+    else { showToast(randItem(SAVE_CHEERS)); }
+    fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date:selectedDate,name,routine,status})});
+    setTimeout(()=>fetchRecords().then(()=>{ loadUser(); renderTodaySummary(); }),1500);
+}
+
+async function quickSave(name,routine,date,cur){
+    const next=cur==='O'?'X':cur==='X'?'-':cur==='-'?'':'O';
+    db=db.filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
+    if(next!=='') db.push({date,name,routine,status:next});
+    renderAdmin();
+    fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date,name,routine,status:next})});
+}
+
+// ============================================================
+// 달력
+// ============================================================
+function renderGrid(name){
+    const grid=document.getElementById('mini-grid'); grid.innerHTML='';
+    const lbl=document.getElementById('cal-member-label');
+    if(name){ lbl.style.display='block'; lbl.innerText='📅 '+name+'님의 '+MONTH_CONFIG[calMonth].label+' 달력'; }
+    else { lbl.style.display='none'; }
+    if(!name) return;
+    const today=getTodayStr(), m=calMonth, days=getDays(m), holidays=getHolidays(m);
+    const joinM=getMemberJoinMonth(name);
+    if(m<joinM){ grid.innerHTML='<div style="text-align:center;color:var(--text-sub);padding:20px;font-weight:700;">해당 월 기록이 없습니다.</div>'; return; }
+    for(let i=1;i<=days;i++){
+        const ds=dateStr(m,i), d=new Date(MONTH_CONFIG[m].year,MONTH_CONFIG[m].monthIdx,i);
+        const isSun=d.getDay()===0, isSat=d.getDay()===6, isHol=holidays.includes(ds);
+        const freeType=getFreeDayType(name,ds);
+        let dO=0,xCnt=0,hasEntry=false,hasVol=false;
+        MEMBERS[name].items.forEach(r=>{
+            const s=getLatestS(name,ds,r);
+            if(s!==''&&s!=='BEFORE_START') hasEntry=true;
+            if(s==='O') dO++; if(s==='⭐'){hasVol=true;dO++;} if(s==='X') xCnt++;
+        });
+        let bg='#fff';
+        if(ds>today) bg='#f8f6f0';
+        else if(hasEntry){ if(xCnt>0&&dO>0) bg='#fef9c3'; else if(xCnt>0) bg='#fee2e2'; else if(dO>0) bg='#dcfce7'; else bg='#f3f4f6'; }
+        else if(freeType==='full') bg='#f3f4f6';
+        else if(ds<today) bg='#fdf6d3';
+        const dot=(hasEntry&&xCnt===0&&dO>0)?'<div class="streak-dot"></div>':'';
+        const star=hasVol?'<div style="font-size:9px">⭐</div>':'';
+        const hol=isHol?'<div style="font-size:8px;color:#c0392b">휴일</div>':'';
+        grid.innerHTML+=`<div class="day-cell ${isSun?'sun':''} ${isSat?'sat':''} ${isHol?'holiday':''} ${selectedDate===ds?'selected':''} ${ds===today?'today-mark':''}" style="background:${bg}" onclick="openDayModal('${name}','${ds}')">${i}(${DAY_NAMES[d.getDay()]})${hol}${star}${dot}</div>`;
+    }
+}
+
+// ============================================================
+// ⑥ 랭킹 (순서: 배지 → 성취율 → 연속, 운영자 제외)
+// ============================================================
+function renderRanking(){
+    const today=getTodayStr();
+    const rankMembers=Object.keys(MEMBERS).filter(n=>n!=="사랑주니");
+    // 성취율 TOP5
+    const rateData=rankMembers.map(name=>{
+        let o=0,x=0;
+        for(let i=1;i<=30;i++){ const ds=dateStr(6,i); if(ds>today) break; MEMBERS[name].items.forEach(r=>{ const s=getLatestS(name,ds,r); if(s==='O'||s==='⭐') o++; if(s==='X') x++; }); }
+        return {name,rate:(o+x)>0?Math.round(o/(o+x)*100):0};
+    }).sort((a,b)=>b.rate-a.rate);
+    const maxR=rateData[0]?.rate||1;
+    document.getElementById('rank-rate-list').innerHTML=rateData.slice(0,5).map((d,i)=>{
+        const num=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위';
+        const pct=Math.round(d.rate/maxR*100);
+        const isMe=d.name===currentUser;
+        return `<div class="rank-card" style="${isMe?'border:2px solid var(--gold);':''}">${isMe?'<div style="position:absolute;right:12px;top:8px;font-size:11px;color:var(--gold);font-weight:900;">나</div>':''}<div class="rank-num ${i<3?'rank-'+(i+1):''}">${num}</div><div class="rank-info"><div class="rank-name">${d.name}</div><div class="rank-val">성취율 ${d.rate}%</div><div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div></div></div>`;
+    }).join('');
+    // 연속 TOP3
+    const streakData=rankMembers.map(name=>({name,streak:calcStreak(name)})).sort((a,b)=>b.streak-a.streak);
+    const maxS=streakData[0]?.streak||1;
+    document.getElementById('rank-streak-list').innerHTML=streakData.slice(0,3).map((d,i)=>{
+        const num=i===0?'🥇':i===1?'🥈':'🥉';
+        const pct=Math.round(d.streak/maxS*100);
+        const isMe=d.name===currentUser;
+        return `<div class="rank-card" style="${isMe?'border:2px solid var(--gold);':''}"><div class="rank-num rank-${i+1}">${num}</div><div class="rank-info"><div class="rank-name">${d.name}</div><div class="rank-val">연속 ${d.streak}일</div><div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div></div></div>`;
+    }).join('');
+}
+
+// ============================================================
+// ⑤ 배지 (연속 5단계 + 성취율 2단계)
+// ============================================================
+function renderBadges(name){
+    const el=document.getElementById('my-badge-area'); if(!name) return;
+    const streak=calcStreak(name);
+    const today=getTodayStr();
+    let O=0,X=0;
+    for(const m of [5,6]) for(let i=1;i<=getDays(m);i++){
+        const ds=dateStr(m,i); if(ds>today) break;
+        MEMBERS[name].items.forEach(r=>{ const s=getLatestS(name,ds,r); if(s==='O'||s==='⭐') O++; if(s==='X') X++; });
+    }
+    const rate=(O+X)>0?Math.round(O/(O+X)*100):0;
+
+    const streakBadges=BADGE_STREAK.map(b=>{
+        const earned=streak>=b.days;
+        return `<div class="badge ${earned?'earned':''}"><div class="badge-icon">${earned?b.icon:'🔒'}</div><div class="badge-label">${b.label}</div><div class="badge-cond">${b.cond}</div><div class="badge-prog">${earned?'✦ 달성!':'현재 '+streak+'일 / '+b.days+'일'}</div></div>`;
+    });
+
+    const rateBadges=BADGE_RATE.map(b=>{
+        const earned=rate>=b.threshold;
+        return `<div class="badge ${earned?'earned':''}"><div class="badge-icon">${earned?b.icon:'🔒'}</div><div class="badge-label">${b.label}</div><div class="badge-cond">${b.cond}</div><div class="badge-prog">${earned?'✦ 달성!':'현재 '+rate+'% / '+b.threshold+'%'}</div></div>`;
+    });
+
+    el.innerHTML=`<div style="font-size:12px;font-weight:900;color:var(--navy);margin-bottom:8px;">🔥 연속 완수 배지</div><div class="badge-grid">${streakBadges.join('')}</div><div style="font-size:12px;font-weight:900;color:var(--navy);margin:14px 0 8px;">🏆 성취율 배지</div><div class="badge-grid">${rateBadges.join('')}</div>`;
+}
+
+// ============================================================
+// 관리자
+// ============================================================
+function setAdminMonth(m){
+    adminMonth=m;
+    document.getElementById('adm-btn-may').className='month-btn'+(m===5?' active':'');
+    document.getElementById('adm-btn-jun').className='month-btn'+(m===6?' active':'');
+    renderAdmin();
+}
+
+function renderAdmin(){
+    const table=document.getElementById('admin-table'), today=getTodayStr(), m=adminMonth;
+    const days=getDays(m), holidays=getHolidays(m), wRanges=WEEK_RANGES[m];
+    const absList=[];
+    Object.keys(MEMBERS).forEach(name=>{
+        let miss=0;
+        for(let i=days;i>=1;i--){ const ds=dateStr(m,i); if(ds>=today) continue; if(MEMBERS[name].items.every(r=>getLatestS(name,ds,r)==='')) miss++; else break; }
+        if(miss>=3) absList.push(name+"("+miss+"일)");
+    });
+    document.getElementById('absence-alert').innerHTML=absList.length>0?
+        `<div style="background:#fff8e1;border:1.5px solid var(--gold);color:#7a5800;padding:11px;border-radius:12px;font-size:13px;font-weight:900;">🆘 3일 이상 미기록: ${absList.join(', ')}</div>`:'';
+    let h='<thead><tr><th rowspan="2">멤버</th><th rowspan="2">루틴</th>';
+    for(let i=1;i<=days;i++){ const ds=dateStr(m,i),d=new Date(MONTH_CONFIG[m].year,MONTH_CONFIG[m].monthIdx,i); const cls=d.getDay()===0||holidays.includes(ds)?'sun-txt':d.getDay()===6?'sat-txt':''; h+=`<th class="${cls}">${i}<br>(${DAY_NAMES[d.getDay()]})</th>`; }
+    wRanges.forEach(w=>h+=`<th class="week-col">${w.label}<br>소결</th>`);
+    h+='<th rowspan="2">성취</th></tr></thead><tbody>';
+    Object.keys(MEMBERS).forEach((n,mi)=>{
+        const items=MEMBERS[n].items, dc=mi>0?'member-divider':'';
+        let miss=0; for(let i=days;i>=1;i--){ const ds=dateStr(m,i); if(ds>=today) continue; if(items.every(r=>getLatestS(n,ds,r)==='')) miss++; else break; }
+        const streak=calcStreak(n), icon=miss>=3?'🆘':miss>=1?'⚠️':streak>=7?'🔥':'💤';
+        const icls=miss>=3?'color:#c0392b':miss>=1?'color:#d4810a':streak>=7?'color:var(--gold)':'color:#9aa0a8';
+        items.forEach((r,idx)=>{
+            h+=`<tr>`;
+            if(idx===0) h+=`<td rowspan="${items.length}" class="${dc}" style="font-weight:900;background:var(--cream2);min-width:70px;font-size:11px;"><span style="${icls}">${icon}</span> ${n}<br><span style="font-size:9px;color:var(--text-sub);font-weight:normal;">[${MEMBERS[n].note||'자유'}]</span></td>`;
+            h+=`<td class="${idx===0?dc:''}" style="text-align:left;padding-left:4px;background:var(--cream2);font-size:9px;">${r}</td>`;
+            for(let i=1;i<=days;i++){
+                const ds=dateStr(m,i),s=getLatestS(n,ds,r);
+                let disp=s,bg='',cl='clickable-cell',oc=`onclick="quickSave('${n}','${r}','${ds}','${s}')"`;
+                if(s==='BEFORE_START'){disp='이전';bg='#f8f6f0';cl='';oc='';}
+                else if(s==='O') bg='#dcfce7';
+                else if(s==='⭐'){disp='⭐';bg='var(--gold-light)';}
+                else if(s==='X') bg='#fee2e2';
+                else if(s==='-'){disp='패스';bg='#f3f4f6';}
+                else if(ds<today){ const ft=getFreeDayType(n,ds); if(ft==='full'){disp='자유';bg='#f3f4f6';} else bg='var(--gold-light)'; }
+                h+=`<td class="${cl} ${idx===0?dc:''}" style="background:${bg}" ${oc}>${disp||''}</td>`;
+            }
+            if(idx===0){
+                wRanges.forEach(w=>{ let wO=0,wT=0; for(let i=w.start;i<=w.end;i++){ const ds=dateStr(m,i); if(ds>today) continue; items.forEach(rt=>{ const st=getLatestS(n,ds,rt); if(st==='O'||st==='⭐') wO++; if(st==='O'||st==='X'||st==='⭐') wT++; }); } h+=`<td class="week-col" rowspan="${items.length}">${wT>0?Math.round(wO/wT*100)+'%':'-'}</td>`; });
+                let mO=0,mV=0; items.forEach(it=>{ for(let i=1;i<=days;i++){ const ds=dateStr(m,i),st=getLatestS(n,ds,it); if(st==='BEFORE_START') continue; if(st==='O'||st==='⭐') mO++; if(st==='O'||st==='X'||st==='⭐') mV++; } });
+                h+=`<td rowspan="${items.length}" class="${dc}" style="font-weight:900;font-size:12px;background:var(--cream2);">${mV>0?Math.round(mO/mV*100):0}%</td>`;
+            }
+            h+='</tr>';
+        });
+    });
+    h+='</tbody>'; table.innerHTML=h;
+}
+
+// ============================================================
+// 모달
+// ============================================================
+function openDayModal(name,date){
+    document.getElementById('modalDate').innerText='📅 '+date+' 기록 상세';
+    let html='';
+    MEMBERS[name].items.forEach(r=>{
+        const s=getLatestS(name,date,r);
+        const label=!s?'미기입':s==='-'?'패스':s==='⭐'?'⭐ 자발 실천':s==='BEFORE_START'?'시작 전':s;
+        const color=(s==='O'||s==='⭐')?'var(--ok)':s==='X'?'var(--no)':'#9a9890';
+        html+=`<div style="padding:11px 0;border-bottom:1px solid #f0ede4;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:15px;">${r}</span><b style="color:${color};font-size:15px;">${label}</b></div>`;
+    });
+    document.getElementById('modalBody').innerHTML=html;
+    document.getElementById('dayModal').style.display='block';
+}
+function closeModal(){ document.getElementById('dayModal').style.display='none'; }
+
+// ============================================================
+// 탭 전환
+// ============================================================
+function showTab(tab){
+    if(tab==='admin'){
+        if(!adminAuthed){ const pw=prompt("관리자 비밀번호를 입력하세요"); if(pw!==ADMIN_PW){ showToast("비밀번호가 틀렸습니다."); return; } adminAuthed=true; }
+        renderAdmin();
+    }
+    if(tab==='rank'){ renderRanking(); if(currentUser) renderBadges(currentUser); }
+    if(tab==='cal'){ updateCalNavButtons(); renderGrid(currentUser); }
+    ['home','cal','rank','admin'].forEach(t=>{
+        document.getElementById('sec-'+t).style.display=t===tab?'block':'none';
+        document.getElementById('nav-'+t).className='nav-item'+(t===tab?' active':'');
+    });
+}
+
+// ============================================================
+// 효과
+// ============================================================
+function showConfetti(){
+    const wrap=document.getElementById('confetti-wrap'); wrap.innerHTML='';
+    const colors=['#F1C40F','#2C3E6B','#219150','#c0392b','#2471a3','#f5d130','#fff'];
+    for(let i=0;i<36;i++){ const p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'vw'; p.style.background=colors[Math.floor(Math.random()*colors.length)]; p.style.animationDelay=Math.random()*0.7+'s'; p.style.width=(Math.random()*8+5)+'px'; p.style.height=(Math.random()*8+5)+'px'; wrap.appendChild(p); }
+    setTimeout(()=>wrap.innerHTML='',2200);
+}
+function showToast(msg){ const t=document.getElementById('toast'); t.innerText=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
+function capture(){ html2canvas(document.querySelector("#capture-area")).then(c=>{ const l=document.createElement('a'); l.download='미라클주니_21기_'+adminMonth+'월_'+getTodayStr()+'.png'; l.href=c.toDataURL(); l.click(); }); }
+function exportXls(){ const wb=XLSX.utils.table_to_book(document.getElementById('admin-table')); XLSX.writeFile(wb,'미라클주니_21기_'+adminMonth+'월_'+getTodayStr()+'.xlsx'); }
+
+// ===== 시작 =====
+loadAllData();
+</script>
+</body>
+</html>
