@@ -79,12 +79,12 @@
         /* TODAY SUMMARY — ③ 오늘 인증 현황만 네이비 유지 */
         .today-summary { background:var(--navy);border-radius:var(--radius);padding:17px 16px;margin-bottom:14px; }
         .today-label { font-size:13px;font-weight:700;color:rgba(255,255,255,0.65); }
-        .today-count { font-size:36px;font-weight:900;color:var(--gold);line-height:1.1;margin:4px 0 8px; }
+        .today-count { font-size:28px;font-weight:900;color:var(--gold);line-height:1.1;margin:4px 0 8px; }
         .today-names { display:flex;flex-wrap:wrap;gap:6px; }
         .today-name-chip { background:rgba(241,196,15,0.14);color:var(--gold);padding:5px 10px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid rgba(241,196,15,0.28); }
 
         /* 순위 한 줄 */
-        .my-rank-line { font-size:15px;font-weight:800;color:rgba(255,255,255,0.8);margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.2); }
+        .my-rank-line { font-size:14px;font-weight:800;color:rgba(255,255,255,0.8);margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.2); }
         .my-rank-line span { color:var(--gold); }
 
         /* USER AREA */
@@ -103,9 +103,7 @@
         .streak-main-line { font-size:18px;font-weight:900;color:var(--navy);margin-bottom:2px; }
         .streak-sub-line  { font-size:13px;color:var(--text-sub);font-weight:700; }
 
-        /* PREV MONTH BTN */
-        .prev-month-btn { width:100%;padding:12px;border-radius:13px;border:2px dashed var(--border);background:var(--card);font-size:14px;font-weight:800;color:var(--text-sub);cursor:pointer;margin-bottom:13px;transition:all 0.2s; }
-        .prev-month-btn.active { border-style:solid;border-color:var(--navy);color:var(--navy);background:var(--gold-light); }
+        /* PREV MONTH BTN — ② 제거됨 */
 
         /* ROUTINE ITEMS */
         .item { display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0ede4; }
@@ -190,7 +188,7 @@
         .month-btn.active { background:var(--navy);color:var(--gold);border-color:var(--navy); }
 
         /* MISC */
-        .footer-note { font-size:13px;color:var(--text-sub);text-align:center;margin-top:10px;font-weight:700;line-height:1.5; }
+        .footer-note { font-size:15px;color:var(--navy);text-align:center;margin-top:10px;font-weight:900;line-height:1.5; }
         .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold); }
         #toast { position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
@@ -199,9 +197,42 @@
         .modal-header { font-weight:900;font-size:16px;margin-bottom:13px;border-bottom:1px solid #f0ede4;padding-bottom:10px;color:var(--navy); }
         ::-webkit-scrollbar { width:4px; }
         ::-webkit-scrollbar-thumb { background:#c8c4b4;border-radius:2px; }
+
+        /* ④ 앱 시작 비밀번호 오버레이 */
+        #pw-overlay { position:fixed;inset:0;background:var(--navy-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10000;padding:30px; }
+        .pw-box { background:var(--card);border-radius:20px;padding:32px 24px;width:100%;max-width:360px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+        .pw-title { font-size:20px;font-weight:900;color:var(--navy);margin-bottom:6px; }
+        .pw-sub   { font-size:13px;color:var(--text-sub);font-weight:700;margin-bottom:24px; }
+        .pw-stars { font-size:28px;letter-spacing:6px;color:var(--gold);margin-bottom:20px; }
+        .pw-input { width:100%;padding:15px;font-size:18px;font-weight:800;border:2px solid var(--border);border-radius:12px;text-align:center;letter-spacing:4px;color:var(--navy);background:var(--cream2);margin-bottom:14px;outline:none; }
+        .pw-input:focus { border-color:var(--gold); }
+        .pw-btn { width:100%;padding:15px;background:var(--navy);color:var(--gold);border:none;border-radius:12px;font-size:16px;font-weight:900;cursor:pointer;letter-spacing:1px; }
+        .pw-btn:active { opacity:0.85; }
+        .pw-error { font-size:13px;color:var(--no);font-weight:800;margin-top:10px;min-height:18px; }
+
+        /* ⑤ 관리자 비밀번호 변경 섹션 */
+        .pw-change-box { background:var(--cream2);border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid var(--border); }
+        .pw-change-title { font-size:14px;font-weight:900;color:var(--navy);margin-bottom:12px; }
+        .pw-change-row { display:flex;gap:8px;align-items:center; }
+        .pw-change-input { flex:1;padding:12px;font-size:15px;font-weight:700;border:2px solid var(--border);border-radius:10px;background:#fff;color:var(--text); }
+        .pw-change-btn { padding:12px 16px;background:var(--navy);color:var(--gold);border:none;border-radius:10px;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap; }
     </style>
 </head>
 <body>
+
+
+<!-- ④ 앱 시작 비밀번호 오버레이 -->
+<div id="pw-overlay">
+    <div class="pw-box">
+        <div class="pw-stars">✦ ✦ ✦</div>
+        <div class="pw-title">미라클 주니 통합센터</div>
+        <div class="pw-sub">21기 · 2026.6.1 ~ 6.30</div>
+        <input class="pw-input" id="pw-input" type="password" placeholder="비밀번호 입력"
+            maxlength="20" onkeydown="if(event.key==='Enter') checkAppPw()">
+        <button class="pw-btn" onclick="checkAppPw()">✦ 입장하기</button>
+        <div class="pw-error" id="pw-error"></div>
+    </div>
+</div>
 
 <div id="loading-overlay">
     <div class="loading-stars">✦ ✦ ✦</div>
@@ -248,10 +279,6 @@
             <option value="">-- 성함을 선택하세요 --</option>
         </select>
 
-        <!-- ⑥ 5월 데이터 없는 멤버에게는 버튼 숨김 — JS에서 제어 -->
-        <button class="prev-month-btn" id="prev-month-btn" onclick="togglePrevMonth()" style="display:none;">
-            📂 이전 기록 보기 (5월)
-        </button>
         <div class="date-selector" id="date-selector"></div>
 
         <div id="userArea" style="display:none;">
@@ -321,6 +348,15 @@
     <!-- ADMIN -->
     <div id="sec-admin" style="display:none;">
         <h3 style="margin:0 0 12px 0;font-weight:900;color:var(--navy);text-align:center;font-size:15px;">📊 21기 실시간 통합 현황</h3>
+        <!-- ⑤ 앱 비밀번호 변경 -->
+        <div class="pw-change-box">
+            <div class="pw-change-title">🔑 앱 비밀번호 변경</div>
+            <div class="pw-change-row">
+                <input class="pw-change-input" id="pw-new-input" type="password" placeholder="새 비밀번호 입력">
+                <button class="pw-change-btn" onclick="changeAppPw()">변경</button>
+            </div>
+            <div id="pw-change-msg" style="font-size:12px;font-weight:800;margin-top:8px;color:var(--text-sub);"></div>
+        </div>
         <div class="month-toggle" style="margin-bottom:12px;">
             <button class="month-btn" id="adm-btn-may" onclick="setAdminMonth(5)">5월 기록</button>
             <button class="month-btn active" id="adm-btn-jun" onclick="setAdminMonth(6)">6월 기록</button>
@@ -408,9 +444,11 @@ const BADGE_RATE = [
 // ============================================================
 let db=[], MEMBERS={}, QUOTES={};
 let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
-let viewingPrevMonth=false, calMonth=6, adminMonth=6;
+let viewingPrevMonth=false, calMonth=6, adminMonth=6; // ② viewingPrevMonth 항상 false (이전달 보기 제거)
 // ① autoSaveFreeDay 중복 실행 방지 — 날짜+멤버별로 관리
 let autoSaveDate={};
+// ④ 앱 비밀번호
+let appPassword="";  // GAS 설정 시트에서 로딩
 
 // ============================================================
 // 유틸
@@ -420,6 +458,75 @@ function dateStr(m,d){ return MONTH_CONFIG[m].str+"-"+String(d).padStart(2,'0');
 function getDays(m){ return MONTH_CONFIG[m].days; }
 function getHolidays(m){ return MONTH_CONFIG[m].holidays; }
 function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// ============================================================
+// ① 앱 시작 비밀번호 확인
+// ============================================================
+
+// ① checkAppPw — GAS app_password와 비교, 당일 인증 저장 (키: mj_pw_auth)
+function checkAppPw(){
+    const input  = document.getElementById('pw-input').value.trim();
+    const errEl  = document.getElementById('pw-error');
+
+    if(!appPassword){
+        // GAS에서 비밀번호를 아직 못 받은 경우
+        errEl.innerText = '비밀번호를 불러오는 중입니다. 잠시 후 다시 시도하세요.';
+        return;
+    }
+
+    if(input === appPassword){
+        // 당일 인증 — localStorage mj_pw_auth = 오늘 날짜(sv-SE)
+        const today = getTodayStr();
+        localStorage.setItem('mj_pw_auth', today);
+        document.getElementById('pw-overlay').style.display = 'none';
+        errEl.innerText = '';
+    } else {
+        errEl.innerText = '비밀번호가 틀렸습니다. 다시 시도해 주세요.';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+    }
+}
+
+// ④ 당일 인증 여부 — mj_pw_auth 값이 오늘 날짜와 같으면 true
+function isPwAuthed(){
+    return localStorage.getItem('mj_pw_auth') === getTodayStr();
+}
+
+// pw-overlay 표시 + 입력창 포커스
+function showPwOverlay(){
+    document.getElementById('pw-overlay').style.display = 'flex';
+    setTimeout(()=>document.getElementById('pw-input').focus(), 300);
+}
+
+// ② changeAppPw — GAS type=setting으로 설정 시트 app_password 업데이트
+async function changeAppPw(){
+    const newPw = document.getElementById('pw-new-input').value.trim();
+    const msgEl = document.getElementById('pw-change-msg');
+    if(!newPw){
+        msgEl.style.color = 'var(--no)';
+        msgEl.innerText   = '새 비밀번호를 입력해 주세요.';
+        return;
+    }
+    msgEl.style.color = 'var(--text-sub)';
+    msgEl.innerText   = '변경 중...';
+    try {
+        // GAS doPost type=setting → 설정 시트 app_password 행 B열 업데이트
+        await fetch(API, {
+            method: 'POST', mode: 'no-cors',
+            body: JSON.stringify({ type:'setting', key:'app_password', value:newPw })
+        });
+        appPassword = newPw;
+        // 변경 후 당일 인증도 갱신 (로그아웃 방지)
+        localStorage.setItem('mj_pw_auth', getTodayStr());
+        document.getElementById('pw-new-input').value = '';
+        msgEl.style.color = 'var(--ok)';
+        msgEl.innerText   = '✅ 변경 완료!';
+        setTimeout(()=>{ msgEl.innerText=''; }, 3000);
+    } catch(e){
+        msgEl.style.color = 'var(--no)';
+        msgEl.innerText   = '변경 실패. 다시 시도해 주세요.';
+    }
+}
 
 // ============================================================
 // ① 로딩 속도 개선
@@ -441,34 +548,45 @@ function fetchWithTimeout(url, ms){
 async function loadAllData(){
     showLoading(true);
 
-    // ① 1단계: 폴백 데이터로 즉시 UI 표시 — GAS 응답 기다리지 않음
+    // ④ 1단계: localStorage mj_pw_auth === 오늘이면 즉시 진입
+    if(isPwAuthed()){
+        document.getElementById('pw-overlay').style.display = 'none';
+    } else {
+        // 당일 인증 없음 — GAS에서 비밀번호 읽어온 후 오버레이 표시
+        try {
+            const settingsRes = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 3000);
+            if(settingsRes.result==="success" && settingsRes.app_password){
+                appPassword = settingsRes.app_password;
+            }
+        } catch(e){ /* 로딩 실패 시 빈 비밀번호로 대기 */ }
+        showLoading(false);
+        showPwOverlay(); // 비밀번호 입력 오버레이 표시
+        // 나머지 데이터 로딩은 오버레이와 무관하게 계속 진행
+    }
+
+    // ① 2단계: 폴백 데이터로 즉시 UI 표시
     loadFallbackMembers();
     loadFallbackQuotes();
-    initUI();        // 폴백으로 화면 먼저 그림 (드롭다운·달력·통계 모두 즉시 표시)
+    initUI();
     showLoading(false);
 
-    // ① 2단계: 백그라운드에서 GAS 실제 데이터 로딩 (타임아웃 1.5초)
+    // ① 3단계: 백그라운드에서 GAS 실제 데이터 로딩
     try {
         const [mRes, qRes] = await Promise.all([
-            fetchWithTimeout(API+"?type=members&v="+Date.now(), 1500),
-            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 1500)
+            fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
+            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 3000)
         ]);
         let memberUpdated = false;
         let quoteUpdated  = false;
         if(mRes.result==="success"){ MEMBERS=mRes.members; memberUpdated=true; }
         if(qRes.result==="success"){ QUOTES=qRes.quotes;   quoteUpdated=true; }
 
-        // 기록 로딩
-        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 1500)
+        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 3000)
             .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
             .catch(()=>{});
 
-        // ① initUI 재호출 금지 — autoSaveFreeDay 중복 실행 방지
-        // 대신 필요한 부분만 선택적으로 갱신
-        if(quoteUpdated) setQuote(); // 명언만 교체
-
+        if(quoteUpdated) setQuote();
         if(memberUpdated){
-            // 드롭다운 멤버 목록 갱신 (선택값 유지)
             const sel=document.getElementById('userSelect');
             const prev=currentUser;
             sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
@@ -476,18 +594,15 @@ async function loadAllData(){
                 .forEach(m=>sel.add(new Option(m,m)));
             if(prev&&MEMBERS[prev]){ sel.value=prev; }
         }
-        // 기록·멤버 중 하나라도 갱신됐으면 화면 데이터 새로고침
         renderTodaySummary();
         if(currentUser) loadUser();
 
-    } catch(e){
-        // 이미 폴백으로 표시됐으므로 무시
-    }
+    } catch(e){ /* 폴백으로 이미 표시됨 */ }
 }
 
 function fetchRecords(){
     // 저장 후 갱신용 (별도 호출)
-    return fetchWithTimeout(API+"?type=records&v="+Date.now(), 1500)
+    return fetchWithTimeout(API+"?type=records&v="+Date.now(), 3000)
         .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
         .catch(()=>{});
 }
@@ -541,8 +656,8 @@ function initUI(){
     sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
     Object.keys(MEMBERS).sort((a,b)=>a==="사랑주니"?-1:b==="사랑주니"?1:a.localeCompare(b,'ko'))
         .forEach(m=>sel.add(new Option(m,m)));
-    const saved=localStorage.getItem('mj_last_user');
-    if(saved&&MEMBERS[saved]){ sel.value=saved; currentUser=saved; }
+    // ⑦ 이름 자동 복원 제거 — 매 접속 시 직접 선택
+    currentUser='';
     // ① selectedDate 초기화 — 오늘이 2026-06-01 이후일 때만 6월 기준으로 보정
     //    오늘이 2026-06-01 이전이면 selectedDate 변경하지 않음 (6월 아직 시작 안 됨)
     const _today = getTodayStr();
@@ -551,8 +666,7 @@ function initUI(){
     }
     setQuote(); setDisplayDate(); renderDateSelector(); renderTodaySummary();
     updateCalNavButtons();
-    // ② localStorage에서 이름 복원 시에도 버튼 표시 여부 즉시 반영
-    if(currentUser) updatePrevMonthBtn(currentUser);
+    // ② updatePrevMonthBtn 제거됨
     if(currentUser) loadUser();
 }
 
@@ -599,51 +713,14 @@ function updateCalNavButtons(){
     if(lbl) lbl.innerText=MONTH_CONFIG[calMonth]?.label||calMonth+"월";
 }
 
-// ============================================================
-// 이전 달 토글 (홈)
-// ============================================================
-function togglePrevMonth(){
-    viewingPrevMonth=!viewingPrevMonth;
-    const btn=document.getElementById('prev-month-btn');
-    if(viewingPrevMonth){
-        btn.innerText="📂 6월 기록 보기 (현재 기수)"; btn.classList.add('active');
-        selectedDate="2026-05-31";
-    } else {
-        btn.innerText="📂 이전 기록 보기 (5월)"; btn.classList.remove('active');
-        selectedDate=getTodayStr();
-    }
-    renderDateSelector();
-    if(currentUser) loadUser();
-}
-
-// ⑥ 5월 데이터 존재 여부 확인 후 버튼 표시 제어
-function updatePrevMonthBtn(name){
-    const btn=document.getElementById('prev-month-btn');
-    if(!name){ btn.style.display='none'; return; }
-    const joinM=getMemberJoinMonth(name);
-    // joinMonth가 5월이면 버튼 표시, 6월이면 숨김
-    btn.style.display=(joinM<=5)?'block':'none';
-    // 표시 중이라면 현재 상태에 따라 라벨도 정리
-    if(joinM<=5 && !viewingPrevMonth){
-        btn.innerText="📂 이전 기록 보기 (5월)";
-        btn.classList.remove('active');
-    }
-}
+// ② 이전 달 토글 기능 제거됨
 
 // ============================================================
 // ⑧ 날짜 칩 — 6월 1일 이전 접속 시에도 칩 하나 이상 표시
 // ============================================================
 function renderDateSelector(){
     const wrap=document.getElementById('date-selector'); wrap.innerHTML='';
-    if(viewingPrevMonth){
-        // ③ 5월 1일~31일 전체 표시 — 가로 스크롤로 이동 가능
-        for(let i=1;i<=31;i++){
-            const d=new Date(2026,4,i);
-            const ds=d.toLocaleDateString('sv-SE');
-            addDateChip(wrap,ds,i+"일("+DAY_NAMES[d.getDay()]+")");
-        }
-        return;
-    }
+    // ② 5월 보기 기능 제거 — 항상 6월 기준
     // 6월 기준 — 오늘이 6월 이전이면 6월 1일 칩 하나라도 보장
     const today=getTodayStr();
     let chips=[];
@@ -751,16 +828,15 @@ function getFreeDayType(name,ds){
 function onUserChange(){
     const name=document.getElementById('userSelect').value; currentUser=name;
     if(name){
-        localStorage.setItem('mj_last_user',name);
+        // ⑦ localStorage 저장 제거
         const joinM=getMemberJoinMonth(name);
         if(calMonth<joinM) calMonth=joinM;
         updateCalNavButtons();
-        updatePrevMonthBtn(name); // ⑥ 버튼 표시 여부 갱신
+        // ② updatePrevMonthBtn 제거됨
         loadUser();
     } else {
         document.getElementById('userArea').style.display='none';
         document.getElementById('my-rank-line').style.display='none';
-        document.getElementById('prev-month-btn').style.display='none';
     }
 }
 
