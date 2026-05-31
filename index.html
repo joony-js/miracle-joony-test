@@ -598,6 +598,10 @@ async function loadAllData(){
         }
         renderTodaySummary();
         if(currentUser) loadUser();
+        // 달력 탭이 활성화 상태이면 GAS 데이터 반영하여 달력 재렌더
+        if(document.getElementById('sec-cal').style.display !== 'none'){
+            renderGrid(currentUser);
+        }
 
     } catch(e){ /* 폴백으로 이미 표시됨 */ }
 }
