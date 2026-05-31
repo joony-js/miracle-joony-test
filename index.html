@@ -1,10 +1,94 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>미라클 주니 테스트</title>
-</head>
-<body>
-    <h1>테스트 중입니다 🌱</h1>
-</body>
-</html>
+// =============================================
+// 미라클 주니 21기 — Google Apps Script
+// =============================================
+
+const SS = SpreadsheetApp.getActiveSpreadsheet();
+
+// ▶ POST 요청 처리 (기록 저장)
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const sheet = SS.getSheetByName("기록");
+    sheet.appendRow([data.date, data.name, data.routine, data.status]);
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ▶ GET 요청 처리 (멤버 목록 + 명언 반환)
+function doGet(e) {
+  try {
+    const type = e.parameter.type;
+
+    if (type === "members") {
+      return getMembersData();
+    } else if (type === "quotes") {
+      return getQuotesData();
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: "error", message: "type 파라미터 필요" }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ▶ 멤버 시트 읽기
+function getMembersData() {
+  const sheet = SS.getSheetByName("멤버");
+  const rows = sheet.getDataRange().getValues();
+  const members = {};
+
+  rows.forEach((row, idx) => {
+    if (idx === 0) return; // 헤더 스킵
+    const name = row[0];
+    if (!name) return;
+
+    const items = String(row[1]).split("|").map(s => s.trim()).filter(Boolean);
+    const note  = String(row[2]).trim() || "없음";
+
+    // D열: 추가루틴시작일 파싱 (예: "영어공부:2026-06-01|말씀:2026-06-10")
+    const configRaw = String(row[3]).trim();
+    const personalConfig = {};
+    if (configRaw) {
+      configRaw.split("|").forEach(pair => {
+        const [routine, startDate] = pair.split(":").map(s => s.trim());
+        if (routine && startDate) personalConfig[routine] = startDate;
+      });
+    }
+
+    members[name] = { items, note, personalConfig };
+  });
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ result: "success", members }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ▶ 명언 시트 읽기
+function getQuotesData() {
+  const sheet = SS.getSheetByName("명언");
+  const rows = sheet.getDataRange().getValues();
+  const quotes = {};
+
+  rows.forEach((row, idx) => {
+    if (idx === 0) return; // 헤더 스킵
+    const day   = Number(row[0]);
+    const text  = String(row[1]).trim();
+    const author = String(row[2]).trim();
+    if (day && text) quotes[day] = [text, author];
+  });
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ result: "success", quotes }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
