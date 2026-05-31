@@ -359,7 +359,7 @@ const O_CHEERS = [
     "🎊 짝짝짝! 루틴 하나 완성!",
     "🚀 슝~ 오늘도 성장 중!",
     "✨ 반짝! 이 순간이 기적이에요!",
-    "😎 �멋있다! 오늘도 실천 완료!",
+    "😎 멋있다! 오늘도 실천 완료!",
     "🌈 좋아요! 조금씩 더 나아지고 있어요!"
 ];
 const SAVE_CHEERS = [
@@ -407,14 +407,22 @@ function getHolidays(m){ return MONTH_CONFIG[m].holidays; }
 function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 // ============================================================
-// 데이터 로딩
+// 데이터 로딩 — ① 타임아웃 3초 + Promise.race 폴백
 // ============================================================
+function fetchWithTimeout(url, ms){
+    const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')), ms));
+    return Promise.race([
+        fetch(url).then(r=>r.json()),
+        timeout
+    ]).catch(()=>({ result:"error" }));
+}
+
 async function loadAllData(){
     showLoading(true);
     try {
         const [mRes,qRes] = await Promise.all([
-            fetch(API+"?type=members&v="+Date.now()).then(r=>r.json()).catch(()=>({result:"error"})),
-            fetch(API+"?type=quotes&v="+Date.now()).then(r=>r.json()).catch(()=>({result:"error"}))
+            fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
+            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 3000)
         ]);
         if(mRes.result==="success") MEMBERS=mRes.members; else loadFallbackMembers();
         if(qRes.result==="success") QUOTES=qRes.quotes; else loadFallbackQuotes();
@@ -425,8 +433,7 @@ async function loadAllData(){
 }
 
 function fetchRecords(){
-    return fetch(API+"?type=records&v="+Date.now())
-        .then(r=>r.json())
+    return fetchWithTimeout(API+"?type=records&v="+Date.now(), 3000)
         .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
         .catch(()=>{});
 }
@@ -624,7 +631,7 @@ function getFreeDayType(name,ds){
     const isHol=allHol.includes(ds);
     let isFree=false;
     if((note.includes("주말&연휴")||note.includes("주말&연휴 루틴 자유"))&&(d===0||d===6||isHol)) isFree=true;
-    else if((note.includes("주말 루틴 자유")||note.includes("주말 기록 자유"))&&(d===0||d===6)) isFree=true;
+    else if(note.includes("주말 루틴 자유")&&(d===0||d===6)) isFree=true;
     else if(note.includes("일요일 루틴 자유")&&d===0) isFree=true;
     else if(note.includes("주말 기상")&&(d===0||d===6)) isFree=true;
     if(!isFree) return false;
