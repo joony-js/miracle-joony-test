@@ -58,8 +58,8 @@
         .current-date { font-size:14px;color:var(--text-sub);margin-top:5px;font-weight:600; }
 
         /* NAV */
-        /* ② nav top은 JS에서 동적 계산 (initUI에서 설정) */
-        .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;z-index:901; }
+        /* ① nav: HTML 순서가 header 다음이므로 top:0으로 헤더 바로 아래 고정 */
+        .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;top:0;z-index:901; }
         .nav-item { flex:1;padding:12px 4px;text-align:center;font-weight:800;border-radius:10px 10px 0 0;background:var(--cream2);color:#aaa;border:none;font-size:12px;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s; }
         .nav-item.active { background:var(--card);color:var(--navy);border-bottom:3px solid var(--gold); }
 
@@ -249,16 +249,17 @@
 </div>
 <div id="missing-alert"></div>
 
-<div class="quote-area">
-    <div class="quote-text" id="quote-text">명언 로딩 중...</div>
-    <div class="quote-author" id="quote-author"></div>
-    <div class="current-date" id="display-date"></div>
-</div>
-
+<!-- ① nav를 quote-area 위로 이동 — sticky 클릭 차단 근본 해결 -->
 <div class="nav">
     <button id="nav-home"  class="nav-item active" onclick="showTab('home')">🏠 홈</button>
     <button id="nav-cal"   class="nav-item" onclick="showTab('cal')">📅 달력</button>
     <button id="nav-admin" class="nav-item" onclick="showTab('admin')">👑 관리자</button>
+</div>
+
+<div class="quote-area">
+    <div class="quote-text" id="quote-text">명언 로딩 중...</div>
+    <div class="quote-author" id="quote-author"></div>
+    <div class="current-date" id="display-date"></div>
 </div>
 
 <div class="content">
@@ -583,7 +584,7 @@ async function loadAllData(){
         if(mRes.result==="success"){ MEMBERS=mRes.members; memberUpdated=true; }
         if(qRes.result==="success"){ QUOTES=qRes.quotes;   quoteUpdated=true; }
 
-        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 3000)
+        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
             .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
             .catch(()=>{});
 
@@ -608,7 +609,7 @@ async function loadAllData(){
 
 function fetchRecords(){
     // 저장 후 갱신용 (별도 호출)
-    return fetchWithTimeout(API+"?type=records&v="+Date.now(), 3000)
+    return fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
         .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
         .catch(()=>{});
 }
@@ -658,13 +659,6 @@ function loadFallbackQuotes(){
 // 초기화
 // ============================================================
 function initUI(){
-    // ② nav top을 헤더 실제 높이로 동적 설정 (CSS top 고정값 대신)
-    const headerEl = document.querySelector('.header');
-    const navEl    = document.querySelector('.nav');
-    if(headerEl && navEl){
-        navEl.style.top = headerEl.offsetHeight + 'px';
-    }
-
     const sel=document.getElementById('userSelect');
     sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
     Object.keys(MEMBERS).sort((a,b)=>a==="사랑주니"?-1:b==="사랑주니"?1:a.localeCompare(b,'ko'))
@@ -1109,7 +1103,14 @@ async function save(name,routine,status){
     fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date:selectedDate,name,routine,status})});
     // 저장 후 1.5초 뒤 서버 동기화 (중복 fetchRecords 제거 — loadAllData와 별도)
     // ② 1.5초 뒤 서버 동기화 — loadUser 제거로 autoSaveFreeDay 중복 방지
-    setTimeout(()=>fetchRecords().then(()=>{ renderTodaySummary(); }),1500);
+    // ② 저장 후 1.5초 동기화 — loadUser + 달력 갱신 포함
+    setTimeout(()=>fetchRecords().then(()=>{
+        renderTodaySummary();
+        if(currentUser) loadUser();
+        if(document.getElementById('sec-cal').style.display !== 'none'){
+            renderGrid(currentUser);
+        }
+    }),1500);
 }
 
 async function quickSave(name,routine,date,cur){
