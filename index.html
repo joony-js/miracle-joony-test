@@ -52,9 +52,9 @@
         .quote-area::before,.quote-area::after { content:'✦';position:absolute;font-size:13px;color:rgba(44,62,107,0.2); }
         .quote-area::before { top:10px;left:14px; }
         .quote-area::after  { bottom:10px;right:14px; }
-        .quote-text   { font-size:15px;font-weight:900;color:var(--navy);word-break:keep-all;line-height:1.65; }
+        .quote-text   { font-size:17px;font-weight:900;color:var(--navy);word-break:keep-all;line-height:1.65; }
         .quote-author { font-size:13px;color:var(--gold-dim);margin-top:9px;font-weight:700; }
-        .current-date { font-size:12px;color:var(--text-sub);margin-top:5px;font-weight:600; }
+        .current-date { font-size:14px;color:var(--text-sub);margin-top:5px;font-weight:600; }
 
         /* NAV */
         .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;top:50px;z-index:900; }
@@ -84,7 +84,7 @@
         .today-name-chip { background:rgba(241,196,15,0.14);color:var(--gold);padding:5px 10px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid rgba(241,196,15,0.28); }
 
         /* 순위 한 줄 */
-        .my-rank-line { font-size:13px;font-weight:800;color:rgba(255,255,255,0.8);margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.2); }
+        .my-rank-line { font-size:15px;font-weight:800;color:rgba(255,255,255,0.8);margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.2); }
         .my-rank-line span { color:var(--gold); }
 
         /* USER AREA */
@@ -543,8 +543,10 @@ function initUI(){
         .forEach(m=>sel.add(new Option(m,m)));
     const saved=localStorage.getItem('mj_last_user');
     if(saved&&MEMBERS[saved]){ sel.value=saved; currentUser=saved; }
-    // ③ selectedDate 초기화 — 6월 이전 접속 시 6월 1일로 보정 (renderDateSelector에서 변경하지 않음)
-    if(!viewingPrevMonth && !selectedDate.startsWith("2026-06")){
+    // ① selectedDate 초기화 — 오늘이 2026-06-01 이후일 때만 6월 기준으로 보정
+    //    오늘이 2026-06-01 이전이면 selectedDate 변경하지 않음 (6월 아직 시작 안 됨)
+    const _today = getTodayStr();
+    if(!viewingPrevMonth && _today >= "2026-06-01" && !selectedDate.startsWith("2026-06")){
         selectedDate = "2026-06-01";
     }
     setQuote(); setDisplayDate(); renderDateSelector(); renderTodaySummary();
@@ -634,10 +636,11 @@ function updatePrevMonthBtn(name){
 function renderDateSelector(){
     const wrap=document.getElementById('date-selector'); wrap.innerHTML='';
     if(viewingPrevMonth){
-        // 5월 마지막 7일
-        for(let i=6;i>=0;i--){
-            const d=new Date(2026,4,31-i);
-            addDateChip(wrap,d.toLocaleDateString('sv-SE'),d.getDate()+"일("+DAY_NAMES[d.getDay()]+")");
+        // ③ 5월 1일~31일 전체 표시 — 가로 스크롤로 이동 가능
+        for(let i=1;i<=31;i++){
+            const d=new Date(2026,4,i);
+            const ds=d.toLocaleDateString('sv-SE');
+            addDateChip(wrap,ds,i+"일("+DAY_NAMES[d.getDay()]+")");
         }
         return;
     }
@@ -649,11 +652,19 @@ function renderDateSelector(){
         const ds=d.toLocaleDateString('sv-SE');
         if(ds.startsWith("2026-06")) chips.push({ds,label:i===0?"오늘("+DAY_NAMES[d.getDay()]+")":(d.getDate()+"일("+DAY_NAMES[d.getDay()]+")")});
     }
-    // ⑧ 6월 칩이 하나도 없으면(접속일이 6월 전) 6월 1일 칩 하나 추가
-    // ③ selectedDate 변경은 이 함수에서 하지 않음 — 초기화 시점(initUI)에서만 처리
+    // ② 6월 칩이 하나도 없으면(접속일이 6월 전)
+    // 오늘이 2026-06-01 이전 → 오늘 날짜 칩 추가
+    // 오늘이 2026-06-01 이후 → 6월 1일 칩 추가
     if(chips.length===0){
-        const d61=new Date(2026,5,1);
-        chips.push({ds:"2026-06-01",label:"6/1("+DAY_NAMES[d61.getDay()]+")"});
+        if(today < "2026-06-01"){
+            // 6월 시작 전 — 오늘 날짜 칩을 그대로 표시
+            const dToday=new Date();
+            chips.push({ds:today, label:"오늘("+DAY_NAMES[dToday.getDay()]+")"});
+        } else {
+            // 6월 시작 이후인데 칩이 없는 경우 — 6월 1일 칩 추가
+            const d61=new Date(2026,5,1);
+            chips.push({ds:"2026-06-01",label:"6/1("+DAY_NAMES[d61.getDay()]+")"});
+        }
     }
     chips.forEach(c=>addDateChip(wrap,c.ds,c.label));
 }
@@ -770,8 +781,13 @@ function loadUser(){
 }
 
 function checkMissingAlert(name){
+    // ② 오늘이 2026-06-01 이전이면 알림 의미 없음 — 숨기고 return
     // ④ viewingPrevMonth일 때 5월 기준으로 체크, 아닐 때 6월 기준
     const today=getTodayStr();
+    if(today < "2026-06-01"){
+        document.getElementById('missing-alert').style.display='none';
+        return;
+    }
     const m=viewingPrevMonth?5:6;
     const days=getDays(m);
     let miss=0, isYest=false;
@@ -906,7 +922,8 @@ function calcStats(name){
     const today=getTodayStr(), m=viewingPrevMonth?5:6, days=getDays(m);
     let O=0,X=0,P=0,recDays=0;
     for(let i=1;i<=days;i++){
-        const ds=dateStr(m,i); if(ds>today) break;
+        // ① 5월 보기일 때는 1~31일 전체 계산, 6월은 오늘까지만
+        const ds=dateStr(m,i); if(!viewingPrevMonth && ds>today) break;
         let hasEntry=false;
         MEMBERS[name].items.forEach(r=>{
             const s=getLatestS(name,ds,r); if(s==='BEFORE_START') return;
