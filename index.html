@@ -48,7 +48,7 @@
         #missing-alert { background:#fff8e1;border:1.5px solid var(--gold);color:#7a5800;margin:10px 14px 0;padding:11px;border-radius:12px;font-size:13px;font-weight:800;text-align:center;display:none; }
 
         /* QUOTE — ⑩ 네이비 배경 → 골드 테두리 + 크림 배경 (20기 스타일) */
-        /* ③ quote-area: sticky 제거 — 달력 탭 클릭 차단 방지 */
+        /* ③ quote-area: JS에서 sticky top 동적 설정 */
         .quote-area { background:var(--gold-light);border:2.5px solid var(--gold);border-radius:var(--radius);margin:13px 14px 0;padding:20px 18px;text-align:center;overflow:hidden; }
         .quote-area::before,.quote-area::after { content:'✦';position:absolute;font-size:13px;color:rgba(44,62,107,0.2); }
         .quote-area::before { top:10px;left:14px; }
@@ -58,12 +58,12 @@
         .current-date { font-size:14px;color:var(--text-sub);margin-top:5px;font-weight:600; }
 
         /* NAV */
-        /* ③ nav: quote-area 아래 위치, top:68px로 헤더 높이만큼 고정 */
-        .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;top:68px;z-index:902; } /* ① nav z-index 902 */
-        .nav-item { flex:1;padding:12px 4px;text-align:center;font-weight:800;border-radius:10px 10px 0 0;background:var(--cream2);color:#aaa;border:none;font-size:12px;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s; }
-        .nav-item.active { background:var(--card);color:var(--navy);border-bottom:3px solid var(--gold); }
+        /* ① nav: 하단 고정 탭바 */
+        .nav { display:flex;gap:0;padding:0;background:var(--card);position:fixed;bottom:0;left:0;right:0;top:auto;z-index:902;border-top:2px solid var(--border);box-shadow:0 -4px 12px rgba(44,62,107,0.10); }
+        .nav-item { flex:1;padding:10px 4px 6px;text-align:center;font-weight:800;border-radius:0;background:var(--card);color:#aaa;border:none;font-size:11px;cursor:pointer;border-bottom:none;transition:all 0.2s; }
+        .nav-item.active { background:var(--card);color:var(--navy);border-bottom:none;border-top:3px solid var(--gold); }
 
-        .content { padding:14px; }
+        .content { padding:14px;padding-bottom:80px; } /* ② 탭바 가림 방지 */
 
         /* CARD */
         .card { background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px;border:1px solid var(--border);box-shadow:var(--shadow); }
@@ -664,12 +664,14 @@ function loadFallbackQuotes(){
 // 초기화
 // ============================================================
 function initUI(){
-    // nav top = 헤더 높이 + quote-area 높이 합산
+    // ③ quote-area sticky top = 헤더 실제 높이로 동적 설정
+    // ④ nav는 하단 고정이므로 top 계산 불필요
     const hEl = document.querySelector('.header');
     const qEl = document.querySelector('.quote-area');
-    const nEl = document.querySelector('.nav');
-    if(hEl && qEl && nEl){
-        nEl.style.top = (hEl.offsetHeight + qEl.offsetHeight) + 'px';
+    if(hEl && qEl){
+        qEl.style.position = 'sticky';
+        qEl.style.top      = hEl.offsetHeight + 'px';
+        qEl.style.zIndex   = '899';
     }
 
     const sel=document.getElementById('userSelect');
