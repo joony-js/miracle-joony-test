@@ -60,7 +60,7 @@
         /* NAV */
         /* ① nav: 하단 고정 탭바 */
         .nav { display:flex;gap:0;padding:0;background:var(--card);position:fixed;bottom:0;left:0;right:0;top:auto;z-index:902;border-top:2px solid var(--border);box-shadow:0 -4px 12px rgba(44,62,107,0.10); }
-        .nav-item { flex:1;padding:10px 4px 6px;text-align:center;font-weight:800;border-radius:0;background:var(--card);color:#aaa;border:none;font-size:11px;cursor:pointer;border-bottom:none;transition:all 0.2s; }
+        .nav-item { flex:1;padding:10px 4px 6px;text-align:center;font-weight:800;border-radius:0;background:var(--card);color:#aaa;border:none;font-size:13px;cursor:pointer;border-bottom:none;transition:all 0.2s;line-height:1.2; }
         .nav-item.active { background:var(--card);color:var(--navy);border-bottom:none;border-top:3px solid var(--gold); }
 
         .content { padding:14px;padding-bottom:80px; } /* ② 탭바 가림 방지 */
@@ -192,7 +192,7 @@
         /* MISC */
         .footer-note { font-size:15px;color:var(--navy);text-align:center;margin-top:10px;font-weight:900;line-height:1.5; }
         .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold);text-align:center; } /* ③ */
-        #toast { position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
+        #toast { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
         .modal { display:none;position:fixed;z-index:7000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6); }
         .modal-content { background:#fff;margin:10% auto;padding:20px;border-radius:var(--radius);width:88%;max-width:420px;border-top:4px solid var(--gold); }
@@ -257,9 +257,9 @@
 
 <!-- ③ nav 원래 위치 복원: header → missing-alert → quote-area → nav → content -->
 <div class="nav">
-    <button id="nav-home"  class="nav-item active" onclick="showTab('home')">🏠 홈</button>
-    <button id="nav-cal"   class="nav-item" onclick="showTab('cal')">📅 달력</button>
-    <button id="nav-admin" class="nav-item" onclick="showTab('admin')">👑 관리자</button>
+    <button id="nav-home"  class="nav-item active" onclick="showTab('home')"><span style="font-size:20px;display:block;">🏠</span>홈</button>
+    <button id="nav-cal"   class="nav-item" onclick="showTab('cal')"><span style="font-size:20px;display:block;">📅</span>달력</button>
+    <button id="nav-admin" class="nav-item" onclick="showTab('admin')"><span style="font-size:20px;display:block;">👑</span>관리자</button>
 </div>
 
 <div class="content">
@@ -317,16 +317,10 @@
                 <div id="my-badge-area"></div>
             </div>
 
-            <!-- 이번 달 성취율 TOP 5 (홈 하단) -->
+            <!-- ② 오늘 함께 체크된 루틴 카드 -->
             <div class="card">
-                <div class="card-title">🏅 이번 달 성취율 TOP 5</div>
-                <div id="rank-rate-list"></div>
-            </div>
-
-            <!-- 연속 기록 TOP 3 (홈 하단) -->
-            <div class="card">
-                <div class="card-title">🔥 연속 기록 TOP 3</div>
-                <div id="rank-streak-list"></div>
+                <div class="card-title">✅ 오늘 함께 체크된 루틴</div>
+                <div id="today-routine-chart"></div>
             </div>
         </div>
     </div>
@@ -349,6 +343,18 @@
                 <span>목</span><span>금</span><span style="color:#2471a3">토</span>
             </div>
             <div id="mini-grid" class="grid-container"></div>
+        </div>
+
+        <!-- ③ 이번 주 루틴 흐름 카드 -->
+        <div class="card">
+            <div class="card-title">📅 이번 주 루틴 흐름</div>
+            <div id="weekly-flow-table" style="overflow-x:auto;"></div>
+        </div>
+
+        <!-- ③ 6월 나의 루틴 흐름 카드 -->
+        <div class="card">
+            <div class="card-title">📊 6월 나의 루틴 흐름</div>
+            <div id="monthly-flow-chart"></div>
         </div>
     </div>
 
@@ -450,7 +456,7 @@ const BADGE_RATE = [
 // ============================================================
 // 상태
 // ============================================================
-let db=[], MEMBERS={}, QUOTES={};
+let db=[], db5=[], MEMBERS={}, QUOTES={}; // ③ db5: 5월 기록 별도 저장
 let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
 let viewingPrevMonth=false, calMonth=6, adminMonth=6; // ② viewingPrevMonth 항상 false (이전달 보기 제거)
 // ① autoSaveFreeDay 중복 실행 방지 — 날짜+멤버별로 관리
@@ -790,6 +796,8 @@ function renderTodaySummary(){
     document.getElementById('today-names').innerHTML=done.map(n=>'<span class="today-name-chip">'+n+'</span>').join('');
     // 순위 표시 (운영자 제외)
     if(currentUser&&currentUser!=="사랑주니") updateMyRank(currentUser);
+    // ② 오늘 루틴 차트도 갱신
+    renderTodayRoutineChart();
 }
 
 // ⑨ "멤버 N명 중"으로 표현 통일 (HTML에서도 적용, JS에서는 total만 제어)
@@ -822,6 +830,16 @@ function updateMyRank(name){
 // ============================================================
 function getLatestS(name,date,routine){
     const rows=db.filter(r=>r.name===name&&r.date===date&&r.routine===routine);
+    if(rows.length) return rows[rows.length-1].status;
+    const cfg=MEMBERS[name]?.personalConfig;
+    if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
+    return '';
+}
+
+// ③ 관리자 탭용 — adminMonth에 따라 db 또는 db5 사용
+function getLatestSAdmin(name,date,routine){
+    const pool = adminMonth===5 ? db5 : db;
+    const rows=pool.filter(r=>r.name===name&&r.date===date&&r.routine===routine);
     if(rows.length) return rows[rows.length-1].status;
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
@@ -879,10 +897,11 @@ function loadUser(){
     renderBadges(name);
     autoSaveFreeDay(name);
     if(name!=="사랑주니") updateMyRank(name);
-    // 홈 하단 배지·랭킹 카드 노출 + 갱신
+    // 홈 하단 배지 카드 노출
     const badgeCard=document.getElementById('home-badge-card');
     if(badgeCard) badgeCard.style.display='block';
-    renderRanking();
+    // ② 오늘 함께 체크된 루틴 차트 렌더
+    renderTodayRoutineChart();
 }
 
 function checkMissingAlert(name){
@@ -1194,65 +1213,7 @@ function renderGrid(name){
 // ============================================================
 // ⑤⑥ 랭킹 — rank-card position:relative, "나" 뱃지 위치 수정
 // ============================================================
-function renderRanking(){
-    const today=getTodayStr();
-    const rankMembers=Object.keys(MEMBERS).filter(n=>n!=="사랑주니");
-
-    // 성취율 TOP5
-    const rateData=rankMembers.map(name=>{
-        let o=0,x=0;
-        for(let i=1;i<=30;i++){ const ds=dateStr(6,i); if(ds>today) break;
-            MEMBERS[name].items.forEach(r=>{ const s=getLatestS(name,ds,r); if(s==='O'||s==='⭐') o++; if(s==='X') x++; }); }
-        return {name,o,x,rate:(o+x)>0?Math.round(o/(o+x)*100):0};
-    // ④ o+x===0인 멤버(기록 없음)는 순위에서 제외
-    }).filter(d=>d.o+d.x>0).sort((a,b)=>b.rate-a.rate);
-    const maxR=rateData[0]?.rate||1;
-
-    // ⑤ 모두 0이면 안내 문구 표시
-    if(rateData.every(d=>d.rate===0)){
-        document.getElementById('rank-rate-list').innerHTML='<div style="text-align:center;color:var(--text-sub);font-size:14px;font-weight:700;padding:20px;">6월 기록이 쌓이면 순위가 표시됩니다 🌱</div>';
-    } else {
-    document.getElementById('rank-rate-list').innerHTML=rateData.slice(0,5).map((d,i)=>{
-        const num=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위';
-        const pct=Math.round(d.rate/maxR*100);
-        const isMe=d.name===currentUser;
-        // ⑤ rank-card에 position:relative는 CSS에, "나" 뱃지는 .rank-me-badge 클래스로
-        return `<div class="rank-card" style="${isMe?'border:2px solid var(--gold);':''}">
-            ${isMe?'<div class="rank-me-badge">나</div>':''}
-            <div class="rank-num ${i<3?'rank-'+(i+1):''}">${num}</div>
-            <div class="rank-info">
-                <div class="rank-name">${d.name}</div>
-                <div class="rank-val">성취율 ${d.rate}%</div>
-                <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
-            </div>
-        </div>`;
-    }).join('');
-    } // ⑤ end rate ranking
-
-    // 연속 TOP3
-    const streakData=rankMembers.map(name=>({name,streak:calcStreak(name)})).sort((a,b)=>b.streak-a.streak);
-    const maxS=streakData[0]?.streak||1;
-
-    // ⑤ 연속 모두 0이면 안내 문구
-    if(streakData.every(d=>d.streak===0)){
-        document.getElementById('rank-streak-list').innerHTML='<div style="text-align:center;color:var(--text-sub);font-size:14px;font-weight:700;padding:20px;">6월 기록이 쌓이면 순위가 표시됩니다 🌱</div>';
-    } else {
-    document.getElementById('rank-streak-list').innerHTML=streakData.slice(0,3).map((d,i)=>{
-        const num=i===0?'🥇':i===1?'🥈':'🥉';
-        const pct=Math.round(d.streak/maxS*100);
-        const isMe=d.name===currentUser;
-        return `<div class="rank-card" style="${isMe?'border:2px solid var(--gold);':''}">
-            ${isMe?'<div class="rank-me-badge">나</div>':''}
-            <div class="rank-num rank-${i+1}">${num}</div>
-            <div class="rank-info">
-                <div class="rank-name">${d.name}</div>
-                <div class="rank-val">연속 ${d.streak}일</div>
-                <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
-            </div>
-        </div>`;
-    }).join('');
-    } // ⑤ end streak ranking
-}
+// ② renderRanking 삭제 — HTML에 rank-rate-list, rank-streak-list 없음
 
 // 배지
 function renderBadges(name){
@@ -1276,7 +1237,15 @@ function setAdminMonth(m){
     adminMonth=m;
     document.getElementById('adm-btn-may').className='month-btn'+(m===5?' active':'');
     document.getElementById('adm-btn-jun').className='month-btn'+(m===6?' active':'');
-    renderAdmin();
+    // ③ 5월 탭 클릭 시 5월 records 별도 로딩 (db5에 저장)
+    if(m===5 && db5.length===0){
+        fetchWithTimeout(API+"?type=records&month=5&v="+Date.now(), 8000)
+            .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db5=d.records; })
+            .catch(()=>{})
+            .finally(()=>renderAdmin());
+    } else {
+        renderAdmin();
+    }
 }
 
 function renderAdmin(){
@@ -1299,7 +1268,7 @@ function renderAdmin(){
     Object.keys(MEMBERS).forEach((n,mi)=>{
         const items=MEMBERS[n].items, dc=mi>0?'member-divider':'';
         // ④ 5월 탭이면 5월 마지막 날 기준으로 미기록 계산
-        let miss=0; for(let i=days;i>=1;i--){ const ds=dateStr(m,i); if(ds>=missThreshold) continue; if(items.every(r=>getLatestS(n,ds,r)==='')) miss++; else break; }
+        let miss=0; for(let i=days;i>=1;i--){ const ds=dateStr(m,i); if(ds>=missThreshold) continue; if(items.every(r=>getLatestSAdmin(n,ds,r)==='')) miss++; else break; }
         const streak=calcStreak(n), icon=miss>=3?'🆘':miss>=1?'⚠️':streak>=7?'🔥':'💤';
         const icls=miss>=3?'color:#c0392b':miss>=1?'color:#d4810a':streak>=7?'color:var(--gold)':'color:#9aa0a8';
         items.forEach((r,idx)=>{
@@ -1307,7 +1276,7 @@ function renderAdmin(){
             if(idx===0) h+=`<td rowspan="${items.length}" class="${dc}" style="font-weight:900;background:var(--cream2);min-width:70px;font-size:11px;"><span style="${icls}">${icon}</span> ${n}<br><span style="font-size:9px;color:var(--text-sub);font-weight:normal;">[${MEMBERS[n].note||'자유'}]</span></td>`;
             h+=`<td class="${idx===0?dc:''}" style="text-align:left;padding-left:4px;background:var(--cream2);font-size:9px;">${r}</td>`;
             for(let i=1;i<=days;i++){
-                const ds=dateStr(m,i),s=getLatestS(n,ds,r);
+                const ds=dateStr(m,i),s=getLatestSAdmin(n,ds,r);
                 let disp=s,bg='',cl='clickable-cell',oc=`onclick="quickSave('${n}','${r}','${ds}','${s}')"`;
                 if(s==='BEFORE_START'){disp='이전';bg='#f8f6f0';cl='';oc='';}
                 else if(s==='O') bg='#dcfce7';
@@ -1318,8 +1287,8 @@ function renderAdmin(){
                 h+=`<td class="${cl} ${idx===0?dc:''}" style="background:${bg}" ${oc}>${disp||''}</td>`;
             }
             if(idx===0){
-                wRanges.forEach(w=>{ let wO=0,wT=0; for(let i=w.start;i<=w.end;i++){ const ds=dateStr(m,i); if(ds>today) continue; items.forEach(rt=>{ const st=getLatestS(n,ds,rt); if(st==='O'||st==='⭐') wO++; if(st==='O'||st==='X'||st==='⭐') wT++; }); } h+=`<td class="week-col" rowspan="${items.length}">${wT>0?Math.round(wO/wT*100)+'%':'-'}</td>`; });
-                let mO=0,mV=0; items.forEach(it=>{ for(let i=1;i<=days;i++){ const ds=dateStr(m,i),st=getLatestS(n,ds,it); if(st==='BEFORE_START') continue; if(st==='O'||st==='⭐') mO++; if(st==='O'||st==='X'||st==='⭐') mV++; } });
+                wRanges.forEach(w=>{ let wO=0,wT=0; for(let i=w.start;i<=w.end;i++){ const ds=dateStr(m,i); if(ds>today) continue; items.forEach(rt=>{ const st=getLatestSAdmin(n,ds,rt); if(st==='O'||st==='⭐') wO++; if(st==='O'||st==='X'||st==='⭐') wT++; }); } h+=`<td class="week-col" rowspan="${items.length}">${wT>0?Math.round(wO/wT*100)+'%':'-'}</td>`; });
+                let mO=0,mV=0; items.forEach(it=>{ for(let i=1;i<=days;i++){ const ds=dateStr(m,i),st=getLatestSAdmin(n,ds,it); if(st==='BEFORE_START') continue; if(st==='O'||st==='⭐') mO++; if(st==='O'||st==='X'||st==='⭐') mV++; } });
                 h+=`<td rowspan="${items.length}" class="${dc}" style="font-weight:900;font-size:12px;background:var(--cream2);">${mV>0?Math.round(mO/mV*100):0}%</td>`;
             }
             h+='</tr>';
@@ -1346,6 +1315,158 @@ function openDayModal(name,date){
 function closeModal(){ document.getElementById('dayModal').style.display='none'; }
 
 // ============================================================
+// ② 오늘 함께 체크된 루틴 차트 (전체 멤버, 사랑주니 제외)
+// ============================================================
+function renderTodayRoutineChart(){
+    const el = document.getElementById('today-routine-chart');
+    if(!el) return;
+    const today = getTodayStr();
+    const members = Object.keys(MEMBERS).filter(n=>n!=="사랑주니");
+
+    // 루틴별 O+⭐ 카운트 집계
+    const countMap = {};
+    members.forEach(name=>{
+        MEMBERS[name].items.forEach(r=>{
+            const s=getLatestS(name,today,r);
+            if(s==='O'||s==='⭐'){
+                countMap[r]=(countMap[r]||0)+1;
+            }
+        });
+    });
+
+    const sorted=Object.entries(countMap).sort((a,b)=>b[1]-a[1]);
+    if(sorted.length===0){
+        el.innerHTML='<div style="text-align:center;color:var(--text-sub);font-size:14px;padding:16px;">아직 오늘 기록이 없어요 🌱</div>';
+        return;
+    }
+    const maxVal=sorted[0][1]||1;
+    el.innerHTML=sorted.map(([r,cnt])=>{
+        const pct=Math.round(cnt/maxVal*100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:90px;font-size:13px;font-weight:700;color:var(--text);text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r}</div>
+            <div style="flex:1;background:var(--cream2);border-radius:6px;height:18px;overflow:hidden;">
+                <div style="width:${pct}%;background:linear-gradient(90deg,var(--navy),var(--gold));height:100%;border-radius:6px;transition:width 0.5s;"></div>
+            </div>
+            <div style="width:24px;font-size:13px;font-weight:900;color:var(--navy);text-align:right;">${cnt}</div>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// ③ 이번 주 루틴 흐름 테이블 (currentUser 기준)
+// ============================================================
+function renderWeeklyFlowTable(name){
+    const el=document.getElementById('weekly-flow-table');
+    if(!el) return;
+    if(!name||!MEMBERS[name]){
+        el.innerHTML='<div style="text-align:center;color:var(--text-sub);font-size:14px;padding:16px;">홈 탭에서 이름을 선택하세요</div>';
+        return;
+    }
+    // 이번 주 월~일 날짜 계산
+    const today=new Date();
+    const dow=today.getDay(); // 0=일
+    const mon=new Date(today); mon.setDate(today.getDate()-(dow===0?6:dow-1));
+    const weekDates=[];
+    for(let i=0;i<7;i++){
+        const d=new Date(mon); d.setDate(mon.getDate()+i);
+        weekDates.push(d.toLocaleDateString('sv-SE'));
+    }
+    const dayLabels=['월','화','수','목','금','토','일'];
+    const items=MEMBERS[name].items;
+
+    // 상태 → 색상/표시
+    function cellStyle(s){
+        if(s==='O'||s==='⭐') return 'background:#dcfce7;color:var(--ok);font-weight:900;';
+        if(s==='X') return 'background:#fee2e2;color:var(--no);font-weight:900;';
+        if(s==='-') return 'background:#f3f4f6;color:var(--etc);';
+        return 'background:#fafafa;color:#ccc;';
+    }
+    function cellText(s){
+        if(s==='O') return 'O';
+        if(s==='⭐') return '⭐';
+        if(s==='X') return 'X';
+        if(s==='-') return '-';
+        return '';
+    }
+
+    let html=`<table style="width:100%;border-collapse:collapse;font-size:11px;text-align:center;">
+        <thead><tr>
+            <th style="text-align:left;padding:4px 6px;font-size:11px;color:var(--text-sub);min-width:80px;">루틴</th>
+            ${dayLabels.map((d,i)=>{
+                const ds=weekDates[i];
+                const isToday=ds===getTodayStr();
+                return `<th style="padding:4px 2px;min-width:28px;${isToday?'color:var(--navy);font-weight:900;':'color:var(--text-sub);'}">${d}</th>`;
+            }).join('')}
+        </tr></thead><tbody>`;
+
+    items.forEach(r=>{
+        html+=`<tr><td style="text-align:left;padding:4px 6px;font-size:11px;font-weight:700;color:var(--text);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r}</td>`;
+        weekDates.forEach(ds=>{
+            const s=getLatestS(name,ds,r);
+            html+=`<td style="padding:3px 2px;${cellStyle(s)}">${cellText(s)}</td>`;
+        });
+        html+='</tr>';
+    });
+    html+='</tbody></table>';
+    el.innerHTML=html;
+}
+
+// ============================================================
+// ③ 6월 나의 루틴 흐름 (currentUser 기준)
+// ============================================================
+function renderMonthlyFlowChart(name){
+    const el=document.getElementById('monthly-flow-chart');
+    if(!el) return;
+    if(!name||!MEMBERS[name]){
+        el.innerHTML='<div style="text-align:center;color:var(--text-sub);font-size:14px;padding:16px;">홈 탭에서 이름을 선택하세요</div>';
+        return;
+    }
+    const today=getTodayStr();
+    const items=MEMBERS[name].items;
+
+    // 루틴별 O+⭐ 달성 일수 + 이번 주 X 횟수 계산
+    const monthCount={}, weekXCount={};
+    const weekStart=new Date(); weekStart.setDate(weekStart.getDate()-(weekStart.getDay()===0?6:weekStart.getDay()-1));
+    const weekStartStr=weekStart.toLocaleDateString('sv-SE');
+    items.forEach(r=>{ monthCount[r]=0; weekXCount[r]=0; });
+
+    for(let i=1;i<=30;i++){
+        const ds=dateStr(6,i);
+        if(ds>today) break;
+        items.forEach(r=>{
+            const s=getLatestS(name,ds,r);
+            if(s==='O'||s==='⭐') monthCount[r]++;
+            if(s==='X'&&ds>=weekStartStr) weekXCount[r]++;
+        });
+    }
+
+    // 가장 많이 달성한 루틴
+    const bestRoutine=items.reduce((a,b)=>monthCount[a]>=monthCount[b]?a:b, items[0]);
+    // 이번 주 X 가장 많은 루틴
+    const worstRoutine=items.reduce((a,b)=>weekXCount[a]>=weekXCount[b]?a:b, items[0]);
+
+    const maxMonth=Math.max(...items.map(r=>monthCount[r]))||1;
+    let html=`<div style="margin-bottom:12px;">`;
+    html+=items.map(r=>{
+        const cnt=monthCount[r];
+        const pct=Math.round(cnt/maxMonth*100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+            <div style="width:90px;font-size:12px;font-weight:700;color:var(--text);text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r}</div>
+            <div style="flex:1;background:var(--cream2);border-radius:6px;height:16px;overflow:hidden;">
+                <div style="width:${pct}%;background:linear-gradient(90deg,var(--navy),var(--gold));height:100%;border-radius:6px;"></div>
+            </div>
+            <div style="width:32px;font-size:12px;font-weight:900;color:var(--navy);text-align:right;">${cnt}일</div>
+        </div>`;
+    }).join('');
+    html+=`</div>
+    <div style="background:var(--gold-light);border-radius:10px;padding:10px 12px;font-size:13px;border:1px solid rgba(241,196,15,0.4);">
+        🏆 <b>가장 많이 달성한 루틴:</b> ${bestRoutine} (${monthCount[bestRoutine]}일)<br>
+        ⚠️ <b>이번 주 놓치기 쉬운 루틴:</b> ${worstRoutine} (X ${weekXCount[worstRoutine]}회)
+    </div>`;
+    el.innerHTML=html;
+}
+
+// ============================================================
 // 탭 전환
 // ============================================================
 function showTab(tab){
@@ -1354,7 +1475,7 @@ function showTab(tab){
         renderAdmin();
     }
     if(tab==='cal'){
-        // ① calMonth가 유효한 월(MONTH_CONFIG에 존재)인지 먼저 확인 — 타임스탬프 오염 방지
+        // ① calMonth 유효성 검사
         if(!MONTH_CONFIG[calMonth]) calMonth=6;
         if(currentUser){
             const joinM=getMemberJoinMonth(currentUser);
@@ -1362,6 +1483,9 @@ function showTab(tab){
         }
         updateCalNavButtons();
         renderGrid(currentUser);
+        // ③ 달력 탭 추가 카드 렌더
+        renderWeeklyFlowTable(currentUser);
+        renderMonthlyFlowChart(currentUser);
     }
     // 랭킹 탭 제거 — 홈 탭으로 이동됨
     ['home','cal','admin'].forEach(t=>{
