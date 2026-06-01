@@ -1135,6 +1135,8 @@ async function quickSave(name,routine,date,cur){
 // ④ 달력 — 이름 없으면 안내 문구, GAS 실패해도 표시
 // ============================================================
 function renderGrid(name){
+    // calMonth가 MONTH_CONFIG에 없으면 6월로 보정
+    if(!MONTH_CONFIG[calMonth]) calMonth=6;
     const grid=document.getElementById('mini-grid');
     const lbl=document.getElementById('cal-member-label');
     const hint=document.getElementById('cal-empty-hint');
@@ -1152,7 +1154,7 @@ function renderGrid(name){
     hint.style.display='none';
     hdr.style.display='grid'; // 버그 수정: 초기 진입 시 display:none 상태 해제
     lbl.style.display='block';
-    lbl.innerText='📅 '+name+'님의 '+MONTH_CONFIG[calMonth].label+' 달력';
+    lbl.innerText='📅 '+name+'님의 '+(MONTH_CONFIG[calMonth]?.label||calMonth+'월')+' 달력';
 
     const today=getTodayStr(), m=calMonth, days=getDays(m), holidays=getHolidays(m);
     const joinM=getMemberJoinMonth(name);
