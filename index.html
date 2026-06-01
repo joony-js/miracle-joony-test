@@ -160,14 +160,14 @@
 
         /* BADGES */
         .badge-grid { display:flex;flex-wrap:wrap;gap:9px; }
-        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1.5px solid var(--border);border-radius:14px;padding:13px 8px;text-align:center;flex:1;min-width:70px;max-width:80px; } /* ③ */
+        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1.5px solid var(--border);border-radius:14px;padding:8px 5px;text-align:center;flex:1;min-width:55px;max-width:72px; } /* ② */
         .badge.earned { background:var(--navy);border-color:var(--gold);box-shadow:0 0 12px rgba(241,196,15,0.32); }
-        .badge-icon  { font-size:16px;margin-bottom:4px; } /* ③ */
-        .badge-label { font-size:12px;font-weight:900;color:var(--text); }
+        .badge-icon  { font-size:18px;margin-bottom:2px; } /* ② */
+        .badge-label { font-size:10px;font-weight:900;color:var(--text); } /* ② */
         .badge.earned .badge-label { color:var(--gold); }
-        .badge-cond  { font-size:10px;color:var(--text-sub);margin-top:3px;line-height:1.3; }
+        .badge-cond  { font-size:9px;color:var(--text-sub);margin-top:3px;line-height:1.3; } /* ② */
         .badge.earned .badge-cond  { color:rgba(241,196,15,0.65); }
-        .badge-prog  { font-size:10px;font-weight:700;color:var(--text-sub);margin-top:4px; }
+        .badge-prog  { font-size:9px;font-weight:700;color:var(--text-sub);margin-top:4px; } /* ② */
         .badge.earned .badge-prog  { color:var(--gold);font-weight:900; }
 
         /* ADMIN */
@@ -438,12 +438,12 @@ const PARTIAL_FREE_ROUTINES = {
 
 // 배지 정의
 const BADGE_STREAK = [
-    { icon:'🌱', label:'새싹',  days:3,  cond:'3일 연속 완수'  },
-    { icon:'🌿', label:'성장',  days:7,  cond:'7일 연속 완수'  },
-    { icon:'⚡', label:'도약',  days:10, cond:'10일 연속 완수' },
-    { icon:'🌸', label:'결실',  days:20, cond:'20일 연속 완수' },
-    { icon:'🔥', label:'불꽃',  days:30, cond:'30일 연속 완수' },
-];
+    { icon:'🌱', label:'새싹',  days:3,  cond:'3일 연속 기록'  },
+    { icon:'🌿', label:'성장',  days:7,  cond:'7일 연속 기록'  },
+    { icon:'⚡', label:'도약',  days:10, cond:'10일 연속 기록' },
+    { icon:'🌸', label:'결실',  days:20, cond:'20일 연속 기록' },
+    { icon:'🔥', label:'불꽃',  days:30, cond:'30일 연속 기록' },
+]; /* ③ */
 // ① BADGE_RATE 삭제 — 성취율 배지 제거
 
 // ============================================================
@@ -555,60 +555,39 @@ function fetchWithTimeout(url, ms){
 async function loadAllData(){
     showLoading(true);
 
-    // ④ 1단계: localStorage mj_pw_auth === 오늘이면 즉시 진입
+    // ① 1단계: settings 비밀번호 로딩 (기존대로 먼저 실행)
     if(isPwAuthed()){
         document.getElementById('pw-overlay').style.display = 'none';
     } else {
-        // 당일 인증 없음 — GAS에서 비밀번호 읽어온 후 오버레이 표시
         try {
             const settingsRes = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000);
             if(settingsRes.result==="success" && settingsRes.app_password){
                 appPassword = settingsRes.app_password;
             }
         } catch(e){ /* 로딩 실패 시 빈 비밀번호로 대기 */ }
-        showLoading(false);
-        showPwOverlay(); // 비밀번호 입력 오버레이 표시
-        // 나머지 데이터 로딩은 오버레이와 무관하게 계속 진행
+        showPwOverlay();
+        // 오버레이 표시 중에도 데이터 로딩 계속 진행
     }
 
-    // ① 2단계: 폴백 데이터로 즉시 UI 표시
-    loadFallbackMembers();
-    loadFallbackQuotes();
-    initUI();
-    showLoading(false);
-
-    // ① 3단계: 백그라운드에서 GAS 실제 데이터 로딩
+    // ① 2단계: GAS members/quotes/records 로딩 완료 후 initUI() 1번 호출
+    //    폴백 loadFallbackMembers/Quotes/initUI 제거 — 5월 데이터 노출 방지
     try {
         const [mRes, qRes] = await Promise.all([
             fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
             fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
         ]);
-        let memberUpdated = false;
-        let quoteUpdated  = false;
-        if(mRes.result==="success"){ MEMBERS=mRes.members; memberUpdated=true; }
-        if(qRes.result==="success"){ QUOTES=qRes.quotes;   quoteUpdated=true; }
+        if(mRes.result==="success") MEMBERS=mRes.members;
+        if(qRes.result==="success") QUOTES=qRes.quotes;
 
         await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
             .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
             .catch(()=>{});
 
-        if(quoteUpdated) setQuote();
-        if(memberUpdated){
-            const sel=document.getElementById('userSelect');
-            const prev=currentUser;
-            sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
-            Object.keys(MEMBERS).sort((a,b)=>a==="사랑주니"?-1:b==="사랑주니"?1:a.localeCompare(b,'ko'))
-                .forEach(m=>sel.add(new Option(m,m)));
-            if(prev&&MEMBERS[prev]){ sel.value=prev; }
-        }
-        renderTodaySummary();
-        if(currentUser) loadUser();
-        // 달력 탭이 활성화 상태이면 GAS 데이터 반영하여 달력 재렌더
-        if(document.getElementById('sec-cal').style.display !== 'none'){
-            renderGrid(currentUser);
-        }
+    } catch(e){ /* GAS 로딩 실패 — MEMBERS/QUOTES/db 빈 상태 유지 */ }
 
-    } catch(e){ /* 폴백으로 이미 표시됨 */ }
+    // ① GAS 로딩 완료 후 showLoading(false) + initUI() 1번만 호출
+    showLoading(false);
+    initUI();
 }
 
 function fetchRecords(){
@@ -1053,7 +1032,7 @@ function calcStats(name){
     renderStreakMini(name);
 }
 
-// 연속 완수 일수 (배지/랭킹용)
+// 연속 기록 일수 (배지/랭킹용)
 function calcStreak(name){
     const today=getTodayStr(); let streak=0;
     const all=[];
