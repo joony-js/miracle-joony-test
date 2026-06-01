@@ -568,7 +568,7 @@ async function loadAllData(){
     } else {
         // 당일 인증 없음 — GAS에서 비밀번호 읽어온 후 오버레이 표시
         try {
-            const settingsRes = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 3000);
+            const settingsRes = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000);
             if(settingsRes.result==="success" && settingsRes.app_password){
                 appPassword = settingsRes.app_password;
             }
