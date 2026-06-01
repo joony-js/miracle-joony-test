@@ -58,8 +58,8 @@
         .current-date { font-size:14px;color:var(--text-sub);margin-top:5px;font-weight:600; }
 
         /* NAV */
-        /* ① nav: HTML 순서가 header 다음이므로 top:0으로 헤더 바로 아래 고정 */
-        .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;top:0;z-index:901; }
+        /* ③ nav: quote-area 아래 위치, top:68px로 헤더 높이만큼 고정 */
+        .nav { display:flex;gap:0;padding:10px 14px 0;background:var(--cream);position:sticky;top:68px;z-index:901; }
         .nav-item { flex:1;padding:12px 4px;text-align:center;font-weight:800;border-radius:10px 10px 0 0;background:var(--cream2);color:#aaa;border:none;font-size:12px;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s; }
         .nav-item.active { background:var(--card);color:var(--navy);border-bottom:3px solid var(--gold); }
 
@@ -249,17 +249,17 @@
 </div>
 <div id="missing-alert"></div>
 
-<!-- ① nav를 quote-area 위로 이동 — sticky 클릭 차단 근본 해결 -->
-<div class="nav">
-    <button id="nav-home"  class="nav-item active" onclick="showTab('home')">🏠 홈</button>
-    <button id="nav-cal"   class="nav-item" onclick="showTab('cal')">📅 달력</button>
-    <button id="nav-admin" class="nav-item" onclick="showTab('admin')">👑 관리자</button>
-</div>
-
 <div class="quote-area">
     <div class="quote-text" id="quote-text">명언 로딩 중...</div>
     <div class="quote-author" id="quote-author"></div>
     <div class="current-date" id="display-date"></div>
+</div>
+
+<!-- ③ nav 원래 위치 복원: header → missing-alert → quote-area → nav → content -->
+<div class="nav">
+    <button id="nav-home"  class="nav-item active" onclick="showTab('home')">🏠 홈</button>
+    <button id="nav-cal"   class="nav-item" onclick="showTab('cal')">📅 달력</button>
+    <button id="nav-admin" class="nav-item" onclick="showTab('admin')">👑 관리자</button>
 </div>
 
 <div class="content">
@@ -466,7 +466,7 @@ function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 // ① 앱 시작 비밀번호 확인
 // ============================================================
 
-// ① checkAppPw — GAS app_password와 비교, 당일 인증 저장 (키: mj_pw_auth)
+// ① checkAppPw — GAS app_password와 비교, 인증 시각 저장 (키: mj_pw_auth)
 function checkAppPw(){
     const input  = document.getElementById('pw-input').value.trim();
     const errEl  = document.getElementById('pw-error');
@@ -478,9 +478,8 @@ function checkAppPw(){
     }
 
     if(input === appPassword){
-        // 당일 인증 — localStorage mj_pw_auth = 오늘 날짜(sv-SE)
-        const today = getTodayStr();
-        localStorage.setItem('mj_pw_auth', today);
+        // ④ 인증 시각(ms 타임스탬프) 저장 — 1시간 유효
+        localStorage.setItem('mj_pw_auth', Date.now().toString());
         document.getElementById('pw-overlay').style.display = 'none';
         errEl.innerText = '';
     } else {
@@ -490,9 +489,10 @@ function checkAppPw(){
     }
 }
 
-// ④ 당일 인증 여부 — mj_pw_auth 값이 오늘 날짜와 같으면 true
+// ④ 인증 유효 여부 — 저장된 타임스탬프로부터 1시간 이내이면 true
 function isPwAuthed(){
-    return localStorage.getItem('mj_pw_auth') === getTodayStr();
+    const saved = parseInt(localStorage.getItem('mj_pw_auth') || '0', 10);
+    return (Date.now() - saved) < 60 * 60 * 1000; // 1시간 = 3600000ms
 }
 
 // pw-overlay 표시 + 입력창 포커스
@@ -520,7 +520,7 @@ async function changeAppPw(){
         });
         appPassword = newPw;
         // 변경 후 당일 인증도 갱신 (로그아웃 방지)
-        localStorage.setItem('mj_pw_auth', getTodayStr());
+        localStorage.setItem('mj_pw_auth', Date.now().toString()); // ④ 변경 후 1시간 유효 갱신
         document.getElementById('pw-new-input').value = '';
         msgEl.style.color = 'var(--ok)';
         msgEl.innerText   = '✅ 변경 완료!';
@@ -659,6 +659,11 @@ function loadFallbackQuotes(){
 // 초기화
 // ============================================================
 function initUI(){
+    // 헤더 실제 높이로 nav top 동적 설정
+    const hEl = document.querySelector('.header');
+    const nEl = document.querySelector('.nav');
+    if(hEl && nEl) nEl.style.top = hEl.offsetHeight + 'px';
+
     const sel=document.getElementById('userSelect');
     sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
     Object.keys(MEMBERS).sort((a,b)=>a==="사랑주니"?-1:b==="사랑주니"?1:a.localeCompare(b,'ko'))
