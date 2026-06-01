@@ -1256,7 +1256,7 @@ function renderAdmin(){
     const missThreshold = m===5 ? "2026-05-31" : today;
     Object.keys(MEMBERS).forEach(name=>{
         let miss=0;
-        for(let i=days;i>=1;i--){ const ds=dateStr(m,i); if(ds>=missThreshold) continue; if(MEMBERS[name].items.every(r=>getLatestS(name,ds,r)==='')) miss++; else break; }
+        for(let i=days;i>=1;i--){ const ds=dateStr(m,i); if(ds>=missThreshold) continue; if(MEMBERS[name].items.every(r=>getLatestSAdmin(name,ds,r)==='')) miss++; else break; }
         if(miss>=3) absList.push(name+"("+miss+"일)");
     });
     document.getElementById('absence-alert').innerHTML=absList.length>0?
