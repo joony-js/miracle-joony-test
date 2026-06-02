@@ -475,21 +475,19 @@ function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 // ① checkAppPw — GAS app_password와 비교, 인증 시각 저장 (키: mj_pw_auth)
 function checkAppPw(){
-    const input = document.getElementById('pw-input').value.trim();
-    const errEl = document.getElementById('pw-error');
-
-    if(!input){ errEl.innerText='비밀번호를 입력해 주세요.'; return; }
+    const input  = document.getElementById('pw-input').value.trim();
+    const errEl  = document.getElementById('pw-error');
 
     if(!appPassword){
-        // GAS에서 비밀번호를 못 받은 경우 — 새로고침 안내
-        errEl.innerText = '비밀번호를 불러오지 못했습니다. 페이지를 새로고침해 주세요.';
+        errEl.innerText = '비밀번호를 불러오는 중입니다. 잠시 후 다시 시도하세요.';
         return;
     }
 
     if(input === appPassword){
+        // 인증 시각(ms 타임스탬프) 저장 — 1시간 유효
         localStorage.setItem('mj_pw_auth', Date.now().toString());
+        document.getElementById('pw-overlay').style.display = 'none';
         errEl.innerText = '';
-        enterApp();
     } else {
         errEl.innerText = '비밀번호가 틀렸습니다. 다시 시도해 주세요.';
         document.getElementById('pw-input').value = '';
@@ -557,69 +555,40 @@ function fetchWithTimeout(url, ms){
 }
 
 async function loadAllData(){
+    showLoading(true);
 
-    // 비밀번호 인증 먼저 처리
+    // 1단계: settings 비밀번호 로딩
     if(isPwAuthed()){
-        // 이미 인증됨 — 로딩 화면 표시 후 데이터 로딩
         document.getElementById('pw-overlay').style.display = 'none';
-        showLoading(true);
-        setLoadingText('⏳ 데이터 불러오는 중...');
-        await loadDataFromGAS();
-        showLoading(false);
-        requestAnimationFrame(()=>requestAnimationFrame(()=>initUI()));
     } else {
-        // 미인증 — loading 숨기고 settings 먼저 로딩 후 pw-overlay 표시
-        document.getElementById('loading-overlay').style.display = 'none';
-
-        // settings 로딩 시도 (실패해도 pw-overlay는 반드시 표시)
         try {
-            const res = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000);
-            if(res.result==="success" && res.app_password){
-                appPassword = res.app_password;
+            const settingsRes = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000);
+            if(settingsRes.result==="success" && settingsRes.app_password){
+                appPassword = settingsRes.app_password;
             }
         } catch(e){}
-
-        // appPassword 로딩 완료(성공/실패 무관) 후 pw-overlay 표시
         showPwOverlay();
+        // pw-overlay 표시 중에도 데이터 로딩 계속 진행
     }
-}
 
-// 비밀번호 통과 후 앱 진입
-async function enterApp(){
-    document.getElementById('pw-overlay').style.display = 'none';
-    showLoading(true);
-    setLoadingText('⏳ 데이터 불러오는 중...');
-    await loadDataFromGAS();
-    showLoading(false);
-    requestAnimationFrame(()=>requestAnimationFrame(()=>initUI()));
-}
-
-// GAS 데이터 로딩 공통 함수
-async function loadDataFromGAS(){
+    // 2단계: members/quotes/records 로딩
     try {
-        const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), 10000);
-        if(allRes.result==="success"){
-            if(allRes.members) MEMBERS=allRes.members;
-            if(allRes.quotes)  QUOTES=allRes.quotes;
-            if(Array.isArray(allRes.records)) db=allRes.records;
-            setLoadingText('✅ 완료! 잠시만요...');
-        } else {
-            setLoadingText('⏳ 멤버 정보 불러오는 중...');
-            const [mRes, qRes] = await Promise.all([
-                fetchWithTimeout(API+"?type=members&v="+Date.now(), 5000),
-                fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
-            ]);
-            if(mRes.result==="success") MEMBERS=mRes.members;
-            if(qRes.result==="success") QUOTES=qRes.quotes;
-            setLoadingText('⏳ 기록 불러오는 중...');
-            await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
-                .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
-                .catch(()=>{});
-            setLoadingText('✅ 완료! 잠시만요...');
-        }
-    } catch(e){
-        setLoadingText('⚠️ 네트워크 오류 — 기본 화면으로 전환합니다');
-    }
+        const [mRes, qRes] = await Promise.all([
+            fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
+            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
+        ]);
+        if(mRes.result==="success") MEMBERS=mRes.members;
+        if(qRes.result==="success") QUOTES=qRes.quotes;
+
+        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
+            .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
+            .catch(()=>{});
+
+    } catch(e){}
+
+    // 로딩 완료 후 initUI() 한 번만 호출
+    showLoading(false);
+    initUI();
 }
 
 function fetchRecords(){
@@ -631,26 +600,8 @@ function fetchRecords(){
 
 function showLoading(show){
     const el=document.getElementById('loading-overlay');
-    if(show){
-        // 로딩 시작: 완전히 표시 + 클릭 차단 (pw-overlay 없을 때만)
-        el.style.display='flex';
-        el.style.opacity='1';
-        // pw-overlay가 표시 중이면 loading이 클릭 차단하지 않음
-        const pwVisible = document.getElementById('pw-overlay')?.style.display !== 'none';
-        el.style.pointerEvents = pwVisible ? 'none' : 'all';
-        el.classList.add('active');
-        el.classList.remove('hidden');
-    } else {
-        // 로딩 완료: pointer-events 즉시 차단, opacity 페이드아웃
-        el.style.pointerEvents='none';
-        el.classList.remove('active');
-        el.style.opacity='0';
-        setTimeout(()=>{ el.style.display='none'; }, 400);
-    }
-}
-function setLoadingText(msg){
-    const el=document.getElementById('loading-sub-text');
-    if(el) el.innerText=msg;
+    el.style.opacity=show?'1':'0';
+    if(!show) setTimeout(()=>{ el.style.display='none'; }, 400);
 }
 
 // ============================================================
