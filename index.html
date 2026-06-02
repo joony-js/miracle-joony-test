@@ -372,6 +372,7 @@
 // ============================================================
 const API = "https://script.google.com/macros/s/AKfycbzPm7_30HAT87RM60Ii1X1mzGxGp8CljHTvwbHPNACQ_Eq6et-hqVzVhN8p9OD8zwuNpg/exec";
 const ADMIN_PW = "4120";
+const APP_PASSWORD = "1234"; // 2. 앱 입장 비밀번호 내장
 
 const MONTH_CONFIG = {
     5:{ year:2026, monthIdx:4, days:31, str:"2026-05", label:"5월", holidays:["2026-05-05","2026-05-25"] },
@@ -436,11 +437,8 @@ function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function checkAppPw(){
     const input  = document.getElementById('pw-input').value.trim();
     const errEl  = document.getElementById('pw-error');
-    if(!appPassword){
-        errEl.innerText = '비밀번호를 불러오는 중입니다. 잠시 후 다시 시도하세요.';
-        return;
-    }
-    if(input === appPassword){
+    // 2. 내장 비밀번호와 직접 비교 (GAS 의존 제거)
+    if(input === APP_PASSWORD){
         localStorage.setItem('mj_pw_auth', Date.now().toString());
         document.getElementById('pw-overlay').style.display = 'none';
         errEl.innerText = '';
@@ -490,62 +488,34 @@ async function loadAllData(){
     const selEl = document.getElementById('userSelect');
     if(selEl) selEl.disabled = true;
 
+    // 2. 비밀번호 내장 — GAS settings 호출 제거
     if(isPwAuthed()){
         document.getElementById('pw-overlay').style.display = 'none';
-        // 2. 인증된 경우: settings + type=all 병렬 호출로 지연 단축
-        try {
-            const [settingsRes, allRes] = await Promise.all([
-                fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000),
-                fetchWithTimeout(API+"?type=all&v="+Date.now(), 6000) // 2. 타임아웃 10초→6초
-            ]);
-            if(settingsRes.result==="success" && settingsRes.app_password){
-                appPassword = settingsRes.app_password;
-            }
-            if(allRes.result==="success"){
-                if(allRes.members) MEMBERS = allRes.members;
-                if(allRes.quotes)  QUOTES  = allRes.quotes;
-                if(Array.isArray(allRes.records)) db = allRes.records;
-            } else {
-                // type=all 미지원 시 개별 호출 fallback
-                const [mRes, qRes] = await Promise.all([
-                    fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
-                    fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
-                ]);
-                if(mRes.result==="success") MEMBERS = mRes.members;
-                if(qRes.result==="success") QUOTES  = qRes.quotes;
-                await fetchWithTimeout(API+"?type=records&v="+Date.now(), 6000)
-                    .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
-                    .catch(()=>{});
-            }
-        } catch(e){}
     } else {
-        // 2. 미인증: settings + type=all 병렬 호출
-        try {
-            const [settingsRes, allRes] = await Promise.all([
-                fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000),
-                fetchWithTimeout(API+"?type=all&v="+Date.now(), 6000) // 2. 타임아웃 10초→6초
-            ]);
-            if(settingsRes.result==="success" && settingsRes.app_password){
-                appPassword = settingsRes.app_password;
-            }
-            if(allRes.result==="success"){
-                if(allRes.members) MEMBERS = allRes.members;
-                if(allRes.quotes)  QUOTES  = allRes.quotes;
-                if(Array.isArray(allRes.records)) db = allRes.records;
-            } else {
-                const [mRes, qRes] = await Promise.all([
-                    fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
-                    fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
-                ]);
-                if(mRes.result==="success") MEMBERS = mRes.members;
-                if(qRes.result==="success") QUOTES  = qRes.quotes;
-                await fetchWithTimeout(API+"?type=records&v="+Date.now(), 6000)
-                    .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
-                    .catch(()=>{});
-            }
-        } catch(e){}
         showPwOverlay();
+        // 비밀번호 입력 중에도 데이터 로딩 계속 진행
     }
+
+    // type=all 단일 호출 (settings 호출 없이 바로 데이터 로딩)
+    try {
+        const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), 6000);
+        if(allRes.result==="success"){
+            if(allRes.members) MEMBERS = allRes.members;
+            if(allRes.quotes)  QUOTES  = allRes.quotes;
+            if(Array.isArray(allRes.records)) db = allRes.records;
+        } else {
+            // type=all 미지원 시 개별 호출 fallback
+            const [mRes, qRes] = await Promise.all([
+                fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
+                fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
+            ]);
+            if(mRes.result==="success") MEMBERS = mRes.members;
+            if(qRes.result==="success") QUOTES  = qRes.quotes;
+            await fetchWithTimeout(API+"?type=records&v="+Date.now(), 6000)
+                .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
+                .catch(()=>{});
+        }
+    } catch(e){}
 
     showLoading(false);
     // 2. 로딩 완료 후 select 활성화
@@ -624,7 +594,16 @@ function changeCalMonth(delta){
     const avail=getAvailableMonths(currentUser);
     const ni=avail.indexOf(calMonth)+delta;
     if(ni<0||ni>=avail.length) return;
-    calMonth=avail[ni]; updateCalNavButtons(); renderGrid(currentUser);
+    calMonth=avail[ni]; updateCalNavButtons();
+    // 1. 5월로 이동 시 db5 자동 로딩 후 달력 표시
+    if(calMonth===5 && db5.length===0){
+        fetchWithTimeout(API+"?type=records&month=5&v="+Date.now(), 8000)
+            .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db5=d.records; })
+            .catch(()=>{})
+            .finally(()=>renderGrid(currentUser));
+    } else {
+        renderGrid(currentUser);
+    }
 }
 
 function updateCalNavButtons(){
@@ -1238,8 +1217,16 @@ function showTab(tab){
     if(tab==='cal'){
         if(!MONTH_CONFIG[calMonth]) calMonth=6;
         if(currentUser){ const joinM=getMemberJoinMonth(currentUser); if(calMonth<joinM) calMonth=joinM; }
-        updateCalNavButtons(); renderGrid(currentUser);
-        renderWeeklyFlowTable(currentUser); renderMonthlyFlowChart(currentUser);
+        updateCalNavButtons();
+        // 1. 5월 달력 진입 시 db5 로딩 보장
+        if(calMonth===5 && db5.length===0){
+            fetchWithTimeout(API+"?type=records&month=5&v="+Date.now(), 8000)
+                .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db5=d.records; })
+                .catch(()=>{})
+                .finally(()=>{ renderGrid(currentUser); renderWeeklyFlowTable(currentUser); renderMonthlyFlowChart(currentUser); });
+        } else {
+            renderGrid(currentUser); renderWeeklyFlowTable(currentUser); renderMonthlyFlowChart(currentUser);
+        }
     }
     ['home','cal','admin'].forEach(t=>{
         document.getElementById('sec-'+t).style.display=t===tab?'block':'none';
