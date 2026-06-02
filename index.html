@@ -486,41 +486,70 @@ function fetchWithTimeout(url, ms){
 
 async function loadAllData(){
     showLoading(true);
+    // 2. 로딩 중 select 비활성화 (브라우저 호환성 문제 방지)
+    const selEl = document.getElementById('userSelect');
+    if(selEl) selEl.disabled = true;
 
     if(isPwAuthed()){
         document.getElementById('pw-overlay').style.display = 'none';
-    } else {
+        // 2. 인증된 경우: settings + type=all 병렬 호출로 지연 단축
         try {
-            const settingsRes = await fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000);
+            const [settingsRes, allRes] = await Promise.all([
+                fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000),
+                fetchWithTimeout(API+"?type=all&v="+Date.now(), 6000) // 2. 타임아웃 10초→6초
+            ]);
             if(settingsRes.result==="success" && settingsRes.app_password){
                 appPassword = settingsRes.app_password;
+            }
+            if(allRes.result==="success"){
+                if(allRes.members) MEMBERS = allRes.members;
+                if(allRes.quotes)  QUOTES  = allRes.quotes;
+                if(Array.isArray(allRes.records)) db = allRes.records;
+            } else {
+                // type=all 미지원 시 개별 호출 fallback
+                const [mRes, qRes] = await Promise.all([
+                    fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
+                    fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
+                ]);
+                if(mRes.result==="success") MEMBERS = mRes.members;
+                if(qRes.result==="success") QUOTES  = qRes.quotes;
+                await fetchWithTimeout(API+"?type=records&v="+Date.now(), 6000)
+                    .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
+                    .catch(()=>{});
+            }
+        } catch(e){}
+    } else {
+        // 2. 미인증: settings + type=all 병렬 호출
+        try {
+            const [settingsRes, allRes] = await Promise.all([
+                fetchWithTimeout(API+"?type=settings&v="+Date.now(), 5000),
+                fetchWithTimeout(API+"?type=all&v="+Date.now(), 6000) // 2. 타임아웃 10초→6초
+            ]);
+            if(settingsRes.result==="success" && settingsRes.app_password){
+                appPassword = settingsRes.app_password;
+            }
+            if(allRes.result==="success"){
+                if(allRes.members) MEMBERS = allRes.members;
+                if(allRes.quotes)  QUOTES  = allRes.quotes;
+                if(Array.isArray(allRes.records)) db = allRes.records;
+            } else {
+                const [mRes, qRes] = await Promise.all([
+                    fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
+                    fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
+                ]);
+                if(mRes.result==="success") MEMBERS = mRes.members;
+                if(qRes.result==="success") QUOTES  = qRes.quotes;
+                await fetchWithTimeout(API+"?type=records&v="+Date.now(), 6000)
+                    .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
+                    .catch(()=>{});
             }
         } catch(e){}
         showPwOverlay();
     }
 
-    // 1. type=all 단일 호출로 members+quotes+records 한 번에
-    try {
-        const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), 10000);
-        if(allRes.result==="success"){
-            if(allRes.members) MEMBERS = allRes.members;
-            if(allRes.quotes)  QUOTES  = allRes.quotes;
-            if(Array.isArray(allRes.records)) db = allRes.records;
-        } else {
-            // type=all 미지원 시 개별 호출 fallback
-            const [mRes, qRes] = await Promise.all([
-                fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
-                fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
-            ]);
-            if(mRes.result==="success") MEMBERS = mRes.members;
-            if(qRes.result==="success") QUOTES  = qRes.quotes;
-            await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
-                .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
-                .catch(()=>{});
-        }
-    } catch(e){}
-
     showLoading(false);
+    // 2. 로딩 완료 후 select 활성화
+    if(selEl) selEl.disabled = false;
     initUI();
 }
 
@@ -657,6 +686,19 @@ function getLatestS(name,date,routine){
     const rows=db.filter(r=>{
         if(r.name!==name||r.routine!==routine) return false;
         return String(r.date).substring(0,10)===date; // 5. 날짜 정규화
+    });
+    if(rows.length) return rows[rows.length-1].status;
+    const cfg=MEMBERS[name]?.personalConfig;
+    if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
+    return '';
+}
+
+// 1. 달력 탭용 — calMonth에 따라 db 또는 db5 참조
+function getLatestSGrid(name,date,routine){
+    const pool = calMonth===5 ? db5 : db;
+    const rows=pool.filter(r=>{
+        if(r.name!==name||r.routine!==routine) return false;
+        return String(r.date).substring(0,10)===date;
     });
     if(rows.length) return rows[rows.length-1].status;
     const cfg=MEMBERS[name]?.personalConfig;
@@ -963,7 +1005,8 @@ function renderGrid(name){
         const freeType=getFreeDayType(name,ds);
         let dO=0,xCnt=0,hasEntry=false,hasVol=false;
         (MEMBERS[name]?.items||[]).forEach(r=>{
-            const s=getLatestS(name,ds,r);
+            // 1. calMonth===5이면 db5, 6이면 db 참조
+            const s=getLatestSGrid(name,ds,r);
             if(s!==''&&s!=='BEFORE_START') hasEntry=true;
             if(s==='O') dO++; if(s==='⭐'){hasVol=true;dO++;} if(s==='X') xCnt++;
         });
@@ -1057,7 +1100,8 @@ function openDayModal(name,date){
     document.getElementById('modalDate').innerText='📅 '+date+' 기록 상세';
     let html='';
     (MEMBERS[name]?.items||[]).forEach(r=>{
-        const s=getLatestS(name,date,r);
+        // 1. 달력 탭 모달도 calMonth 기준 pool 사용
+        const s=getLatestSGrid(name,date,r);
         const label=!s?'미기입':s==='-'?'패스':s==='⭐'?'⭐ 자발 실천':s==='BEFORE_START'?'시작 전':s;
         const color=(s==='O'||s==='⭐')?'var(--ok)':s==='X'?'var(--no)':'#9a9890';
         html+=`<div style="padding:11px 0;border-bottom:1px solid #f0ede4;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:15px;">${r}</span><b style="color:${color};font-size:15px;">${label}</b></div>`;
