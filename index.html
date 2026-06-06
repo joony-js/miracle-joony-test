@@ -146,14 +146,14 @@
 
         /* BADGES */
         .badge-grid { display:flex;flex-wrap:wrap;gap:9px; }
-        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1px solid var(--border);border-radius:10px;padding:5px 3px;text-align:center;flex:1;min-width:44px;max-width:58px; } /* 4. 크기 축소 */
+        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1.5px solid var(--border);border-radius:14px;padding:8px 5px;text-align:center;flex:1;min-width:44px;max-width:58px; }
         .badge.earned { background:var(--navy);border-color:var(--gold);box-shadow:0 0 12px rgba(241,196,15,0.32); }
-        .badge-icon  { font-size:14px;margin-bottom:1px; } /* 4. */
-        .badge-label { font-size:9px;font-weight:900;color:var(--text); } /* 4. */
+        .badge-icon  { font-size:14px;margin-bottom:2px; }
+        .badge-label { font-size:10px;font-weight:900;color:var(--text); }
         .badge.earned .badge-label { color:var(--gold); }
-        .badge-cond  { font-size:8px;color:var(--text-sub);margin-top:2px;line-height:1.2; } /* 4. */
+        .badge-cond  { font-size:9px;color:var(--text-sub);margin-top:3px;line-height:1.3; }
         .badge.earned .badge-cond  { color:rgba(241,196,15,0.65); }
-        .badge-prog  { font-size:8px;font-weight:700;color:var(--text-sub);margin-top:2px; } /* 4. */
+        .badge-prog  { font-size:9px;font-weight:700;color:var(--text-sub);margin-top:4px; }
         .badge.earned .badge-prog  { color:var(--gold);font-weight:900; }
 
         /* ADMIN */
@@ -288,7 +288,7 @@
                 <div id="praise-text" class="praise-text" style="display:none;"></div>
                 <div id="routine-list"></div>
                 <div id="personal-note" class="personal-note" style="margin-top:12px;margin-bottom:0;"></div>
-                <div class="footer-note">📢 자유일에도 실천하면 ⭐로 기록해 주세요!</div>
+                <div class="footer-note" id="footer-note-text">📢 자유일에도 실천하면 ⭐로 기록해 주세요!</div>
             </div>
 
             <div class="card" id="home-badge-card" style="display:none;">
@@ -462,9 +462,9 @@ function fetchWithTimeout(url, ms){
     return Promise.race([fetch(url).then(r=>r.json()), timeout]).catch(()=>({ result:"error" }));
 }
 
-// 1. GAS 데이터 로딩 공통 함수 (타임아웃 8초)
-async function fetchAllData(){
-    const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), 8000);
+// GAS 데이터 로딩 공통 함수
+async function fetchAllData(timeout=5000){
+    const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), timeout);
     if(allRes.result==="success"){
         if(allRes.members) MEMBERS = allRes.members;
         if(allRes.quotes)  QUOTES  = allRes.quotes;
@@ -474,11 +474,11 @@ async function fetchAllData(){
         // type=all 미지원 시 개별 호출 fallback
         const [mRes, qRes] = await Promise.all([
             fetchWithTimeout(API+"?type=members&v="+Date.now(), 4000),
-            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
+            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 4000)
         ]);
         if(mRes.result==="success") MEMBERS = mRes.members;
         if(qRes.result==="success") QUOTES  = qRes.quotes;
-        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
+        await fetchWithTimeout(API+"?type=records&v="+Date.now(), timeout)
             .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
             .catch(()=>{});
         return Object.keys(MEMBERS).length > 0;
@@ -491,41 +491,36 @@ async function loadAllData(){
     const selEl = document.getElementById('userSelect');
     if(selEl) selEl.disabled = true;
 
-    // 비밀번호 내장 — GAS settings 호출 제거
+    // 비밀번호 인증 처리
     if(isPwAuthed()){
         document.getElementById('pw-overlay').style.display = 'none';
+        // 인증된 경우: 바로 데이터 로딩
+        setLoadingSub("데이터 불러오는 중...");
+        try { await fetchAllData(30000); } catch(e){}
     } else {
+        // 미인증: 비밀번호 창 표시와 동시에 데이터 로딩 병렬 진행
+        // → 사용자가 비밀번호 입력하는 동안 데이터가 미리 로딩됨
         showPwOverlay();
+        setLoadingSub("데이터 불러오는 중...");
+        try { await fetchAllData(30000); } catch(e){}
     }
 
-    // 1차 시도
-    try { await fetchAllData(); } catch(e){}
-
-    // 1. MEMBERS가 비어있으면 3초 후 재시도 1회
-    if(Object.keys(MEMBERS).length === 0){
-        setLoadingSub("서버에 연결 중... 잠시만 기다려주세요");
-        await new Promise(r=>setTimeout(r, 3000));
-        try { await fetchAllData(); } catch(e){}
-    }
-
-    // 재시도 후에도 MEMBERS 비어있으면 안내 표시
+    // MEMBERS 비어있으면 안내 표시 (30초 타임아웃 후에도 실패한 경우)
     if(Object.keys(MEMBERS).length === 0){
         showLoading(false);
         if(selEl) selEl.disabled = false;
         setLoadingSub("새벽을 깨우는 중...");
-        // 안내 메시지를 화면에 표시
         const alertEl = document.getElementById('missing-alert');
         if(alertEl){
             alertEl.style.display='block';
             alertEl.style.color='#c0392b';
             alertEl.innerText='서버 연결이 느립니다. 잠시 후 새로고침해 주세요 🔄';
         }
-        return; // initUI 호출 안 함
+        return;
     }
 
     showLoading(false);
     setLoadingSub("새벽을 깨우는 중...");
-    // 로딩 완료 후 select 활성화
     if(selEl) selEl.disabled = false;
     initUI();
 }
@@ -777,22 +772,47 @@ function checkMissingAlert(name){
     // 6월 시작 전이면 표시 안 함
     if(today<"2026-06-01"){ el.style.display='none'; return; }
 
-    // 어제 날짜
+    // 6월 1일부터 어제까지 날짜 목록 (최신순)
     const yest=new Date(); yest.setDate(yest.getDate()-1);
     const yestStr=yest.toLocaleDateString('sv-SE');
     if(!yestStr.startsWith("2026-06")){ el.style.display='none'; return; }
 
-    // O도 X도 패스(-)도 없는 루틴만 미기록으로 표시
-    const missedRoutines=MEMBERS[name].items.filter(r=>{
-        const s=getLatestS(name,yestStr,r);
-        return s===''||s==='BEFORE_START';
+    // 6월 1일 ~ 어제 날짜 배열 (최신순)
+    const pastDates=[];
+    for(let i=1;i<=30;i++){
+        const ds=dateStr(6,i);
+        if(ds>=today) break;
+        pastDates.unshift(ds); // 최신순
+    }
+
+    // 날짜별 미체크 루틴 집계
+    const missedByDate=[];
+    pastDates.forEach(ds=>{
+        const missed=MEMBERS[name].items.filter(r=>{
+            const s=getLatestS(name,ds,r);
+            return s===''||s==='BEFORE_START';
+        });
+        if(missed.length>0) missedByDate.push({ds,missed});
     });
 
-    if(missedRoutines.length===0){ el.style.display='none'; return; }
+    if(missedByDate.length===0){ el.style.display='none'; return; }
 
-    const mm=yest.getMonth()+1, dd=yest.getDate();
+    // 표시: 어제는 루틴명 상세, 그 이전은 날짜+개수
+    let lines=[];
+    missedByDate.forEach(({ds,missed})=>{
+        const d=new Date(ds);
+        const label=(d.getMonth()+1)+'/'+(d.getDate());
+        if(ds===yestStr){
+            // 어제: 루틴명 상세 표시
+            lines.push('💡 '+label+' 미체크: '+missed.join(', '));
+        } else {
+            // 이전 날짜: 날짜 + 개수만
+            lines.push('💡 '+label+' 미체크: 항목 '+missed.length+'개');
+        }
+    });
+
     el.style.display='block';
-    el.innerHTML='💡 '+mm+'/'+dd+' 미체크:<br>'+missedRoutines.map(r=>'• '+r).join('<br>');
+    el.innerHTML=lines.join('<br>');
 }
 
 // ============================================================
@@ -952,14 +972,18 @@ function renderRoutineList(name){
             html+=`<div class="item"><span class="item-name">${r}</span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
         }
     });
-    // 3. 자유일이면 안내 문구 추가
-    if(freeType==='full' || freeType==='partial'){
-        html+=`<div style="margin-top:12px;padding:10px 12px;background:var(--gold-light);border-radius:10px;border:1px solid rgba(241,196,15,0.4);font-size:12px;color:#7a5800;line-height:1.6;font-weight:700;">
-            주말·연휴 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>
-            그래도 루틴을 했다면 해당 루틴 오른쪽 ⭐ 별표를 눌러 기록할 수 있습니다.
-        </div>`;
-    }
     document.getElementById('routine-list').innerHTML=html;
+    // 3. footer-note: 자유일이면 안내 문구로 교체, 아니면 기존 문구
+    const fnEl=document.getElementById('footer-note-text');
+    if(fnEl){
+        if(freeType==='full'||freeType==='partial'){
+            fnEl.style.textAlign='left';
+            fnEl.innerHTML='주말·연휴 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>자유일에도 실천했다면 오른쪽 ⭐를 눌러 기록해 주세요.';
+        } else {
+            fnEl.style.textAlign='center';
+            fnEl.innerHTML='📢 자유일에도 실천하면 ⭐로 기록해 주세요!';
+        }
+    }
 }
 
 // ============================================================
