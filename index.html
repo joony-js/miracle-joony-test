@@ -146,14 +146,14 @@
 
         /* BADGES */
         .badge-grid { display:flex;flex-wrap:wrap;gap:9px; }
-        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1.5px solid var(--border);border-radius:14px;padding:8px 5px;text-align:center;flex:1;min-width:55px;max-width:72px; }
+        .badge { display:flex;flex-direction:column;align-items:center;background:var(--cream2);border:1px solid var(--border);border-radius:10px;padding:5px 3px;text-align:center;flex:1;min-width:44px;max-width:58px; } /* 4. 크기 축소 */
         .badge.earned { background:var(--navy);border-color:var(--gold);box-shadow:0 0 12px rgba(241,196,15,0.32); }
-        .badge-icon  { font-size:18px;margin-bottom:2px; }
-        .badge-label { font-size:10px;font-weight:900;color:var(--text); }
+        .badge-icon  { font-size:14px;margin-bottom:1px; } /* 4. */
+        .badge-label { font-size:9px;font-weight:900;color:var(--text); } /* 4. */
         .badge.earned .badge-label { color:var(--gold); }
-        .badge-cond  { font-size:9px;color:var(--text-sub);margin-top:3px;line-height:1.3; }
+        .badge-cond  { font-size:8px;color:var(--text-sub);margin-top:2px;line-height:1.2; } /* 4. */
         .badge.earned .badge-cond  { color:rgba(241,196,15,0.65); }
-        .badge-prog  { font-size:9px;font-weight:700;color:var(--text-sub);margin-top:4px; }
+        .badge-prog  { font-size:8px;font-weight:700;color:var(--text-sub);margin-top:2px; } /* 4. */
         .badge.earned .badge-prog  { color:var(--gold);font-weight:900; }
 
         /* ADMIN */
@@ -332,14 +332,7 @@
     <!-- ADMIN -->
     <div id="sec-admin" style="display:none;">
         <h3 style="margin:0 0 12px 0;font-weight:900;color:var(--navy);text-align:center;font-size:15px;">📊 21기 실시간 통합 현황</h3>
-        <div class="pw-change-box">
-            <div class="pw-change-title">🔑 앱 비밀번호 변경</div>
-            <div class="pw-change-row">
-                <input class="pw-change-input" id="pw-new-input" type="password" placeholder="새 비밀번호 입력">
-                <button class="pw-change-btn" onclick="changeAppPw()">변경</button>
-            </div>
-            <div id="pw-change-msg" style="font-size:12px;font-weight:800;margin-top:8px;color:var(--text-sub);"></div>
-        </div>
+        <!-- 비밀번호 변경 기능 제거 — 깃허브 APP_PASSWORD 상수로 변경 -->
         <div class="month-toggle" style="margin-bottom:12px;">
             <button class="month-btn" id="adm-btn-may" onclick="setAdminMonth(5)">5월 기록</button>
             <button class="month-btn active" id="adm-btn-jun" onclick="setAdminMonth(6)">6월 기록</button>
@@ -420,7 +413,7 @@ let db=[], db5=[], MEMBERS={}, QUOTES={};
 let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
 let viewingPrevMonth=false, calMonth=6, adminMonth=6;
 let autoSaveDate={};
-let appPassword="";
+// appPassword 변수 제거 — APP_PASSWORD 상수 사용
 
 // ============================================================
 // 유틸
@@ -459,20 +452,7 @@ function showPwOverlay(){
     setTimeout(()=>document.getElementById('pw-input').focus(), 300);
 }
 
-async function changeAppPw(){
-    const newPw = document.getElementById('pw-new-input').value.trim();
-    const msgEl = document.getElementById('pw-change-msg');
-    if(!newPw){ msgEl.style.color='var(--no)'; msgEl.innerText='새 비밀번호를 입력해 주세요.'; return; }
-    msgEl.style.color='var(--text-sub)'; msgEl.innerText='변경 중...';
-    try {
-        await fetch(API, { method:'POST', mode:'no-cors', body:JSON.stringify({ type:'setting', key:'app_password', value:newPw }) });
-        appPassword = newPw;
-        localStorage.setItem('mj_pw_auth', Date.now().toString());
-        document.getElementById('pw-new-input').value = '';
-        msgEl.style.color='var(--ok)'; msgEl.innerText='✅ 변경 완료!';
-        setTimeout(()=>{ msgEl.innerText=''; }, 3000);
-    } catch(e){ msgEl.style.color='var(--no)'; msgEl.innerText='변경 실패. 다시 시도해 주세요.'; }
-}
+// changeAppPw 제거 — 비밀번호는 깃허브 APP_PASSWORD 상수로 변경
 
 // ============================================================
 // 1. 로딩 — type=all 단일 호출
@@ -482,45 +462,80 @@ function fetchWithTimeout(url, ms){
     return Promise.race([fetch(url).then(r=>r.json()), timeout]).catch(()=>({ result:"error" }));
 }
 
+// 1. GAS 데이터 로딩 공통 함수 (타임아웃 8초)
+async function fetchAllData(){
+    const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), 8000);
+    if(allRes.result==="success"){
+        if(allRes.members) MEMBERS = allRes.members;
+        if(allRes.quotes)  QUOTES  = allRes.quotes;
+        if(Array.isArray(allRes.records)) db = allRes.records;
+        return true;
+    } else {
+        // type=all 미지원 시 개별 호출 fallback
+        const [mRes, qRes] = await Promise.all([
+            fetchWithTimeout(API+"?type=members&v="+Date.now(), 4000),
+            fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
+        ]);
+        if(mRes.result==="success") MEMBERS = mRes.members;
+        if(qRes.result==="success") QUOTES  = qRes.quotes;
+        await fetchWithTimeout(API+"?type=records&v="+Date.now(), 8000)
+            .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
+            .catch(()=>{});
+        return Object.keys(MEMBERS).length > 0;
+    }
+}
+
 async function loadAllData(){
     showLoading(true);
-    // 2. 로딩 중 select 비활성화 (브라우저 호환성 문제 방지)
+    // 로딩 중 select 비활성화 (브라우저 호환성 문제 방지)
     const selEl = document.getElementById('userSelect');
     if(selEl) selEl.disabled = true;
 
-    // 2. 비밀번호 내장 — GAS settings 호출 제거
+    // 비밀번호 내장 — GAS settings 호출 제거
     if(isPwAuthed()){
         document.getElementById('pw-overlay').style.display = 'none';
     } else {
         showPwOverlay();
-        // 비밀번호 입력 중에도 데이터 로딩 계속 진행
     }
 
-    // type=all 단일 호출 (settings 호출 없이 바로 데이터 로딩)
-    try {
-        const allRes = await fetchWithTimeout(API+"?type=all&v="+Date.now(), 6000);
-        if(allRes.result==="success"){
-            if(allRes.members) MEMBERS = allRes.members;
-            if(allRes.quotes)  QUOTES  = allRes.quotes;
-            if(Array.isArray(allRes.records)) db = allRes.records;
-        } else {
-            // type=all 미지원 시 개별 호출 fallback
-            const [mRes, qRes] = await Promise.all([
-                fetchWithTimeout(API+"?type=members&v="+Date.now(), 3000),
-                fetchWithTimeout(API+"?type=quotes&v="+Date.now(), 5000)
-            ]);
-            if(mRes.result==="success") MEMBERS = mRes.members;
-            if(qRes.result==="success") QUOTES  = qRes.quotes;
-            await fetchWithTimeout(API+"?type=records&v="+Date.now(), 6000)
-                .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db=d.records; })
-                .catch(()=>{});
+    // 1차 시도
+    try { await fetchAllData(); } catch(e){}
+
+    // 1. MEMBERS가 비어있으면 3초 후 재시도 1회
+    if(Object.keys(MEMBERS).length === 0){
+        setLoadingSub("서버에 연결 중... 잠시만 기다려주세요");
+        await new Promise(r=>setTimeout(r, 3000));
+        try { await fetchAllData(); } catch(e){}
+    }
+
+    // 재시도 후에도 MEMBERS 비어있으면 안내 표시
+    if(Object.keys(MEMBERS).length === 0){
+        showLoading(false);
+        if(selEl) selEl.disabled = false;
+        setLoadingSub("새벽을 깨우는 중...");
+        // 안내 메시지를 화면에 표시
+        const alertEl = document.getElementById('missing-alert');
+        if(alertEl){
+            alertEl.style.display='block';
+            alertEl.style.color='#c0392b';
+            alertEl.innerText='서버 연결이 느립니다. 잠시 후 새로고침해 주세요 🔄';
         }
-    } catch(e){}
+        return; // initUI 호출 안 함
+    }
 
     showLoading(false);
-    // 2. 로딩 완료 후 select 활성화
+    setLoadingSub("새벽을 깨우는 중...");
+    // 로딩 완료 후 select 활성화
     if(selEl) selEl.disabled = false;
     initUI();
+}
+
+// 1. 로딩 서브 메시지 변경 헬퍼
+function setLoadingSub(msg){
+    const el=document.getElementById('loading-overlay');
+    if(!el) return;
+    const sub=el.querySelector('.loading-sub');
+    if(sub) sub.innerText=msg;
 }
 
 function fetchRecords(){
@@ -650,10 +665,13 @@ function addDateChip(wrap,ds,label){
 function renderTodaySummary(){
     const today=getTodayStr();
     const memberList=Object.keys(MEMBERS).filter(n=>n!=="사랑주니");
-    const done=memberList.filter(n=>MEMBERS[n].items.some(r=>{ const s=getLatestS(n,today,r); return s==='O'||s==='⭐'; }));
+    // 2. O/X/패스(-) 상관없이 기록 하나라도 있으면 명단에 포함
+    const done=memberList.filter(n=>MEMBERS[n].items.some(r=>{
+        const s=getLatestS(n,today,r);
+        return s==='O'||s==='⭐'||s==='X'||s==='-';
+    }));
     document.getElementById('today-count').innerText=done.length+"명 / "+memberList.length+"명";
     document.getElementById('today-names').innerHTML=done.map(n=>'<span class="today-name-chip">'+n+'</span>').join('');
-    // 2. updateMyRank 호출 제거
     renderTodayRoutineChart();
 }
 
@@ -934,6 +952,13 @@ function renderRoutineList(name){
             html+=`<div class="item"><span class="item-name">${r}</span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
         }
     });
+    // 3. 자유일이면 안내 문구 추가
+    if(freeType==='full' || freeType==='partial'){
+        html+=`<div style="margin-top:12px;padding:10px 12px;background:var(--gold-light);border-radius:10px;border:1px solid rgba(241,196,15,0.4);font-size:12px;color:#7a5800;line-height:1.6;font-weight:700;">
+            주말·연휴 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>
+            그래도 루틴을 했다면 해당 루틴 오른쪽 ⭐ 별표를 눌러 기록할 수 있습니다.
+        </div>`;
+    }
     document.getElementById('routine-list').innerHTML=html;
 }
 
