@@ -987,10 +987,10 @@ function renderRoutineList(name){
     const fnEl=document.getElementById('footer-note-text');
     if(fnEl){
         if(freeType==='full'||freeType==='partial'){
-            fnEl.style.textAlign='left';
+            fnEl.style.textAlign='center';
             fnEl.innerHTML='주말·연휴 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>자유일에도 실천했다면 오른쪽 ⭐를 눌러 기록해 주세요.';
         } else {
-            fnEl.style.textAlign='left';
+            fnEl.style.textAlign='center';
             fnEl.innerHTML='📢 자유일에도 실천하면 ⭐로 기록해 주세요!';
         }
     }
