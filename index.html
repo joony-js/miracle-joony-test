@@ -177,7 +177,7 @@
 
         /* MISC */
         .footer-note { font-size:15px;color:var(--navy);text-align:center;margin-top:10px;font-weight:900;line-height:1.5; }
-        .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold);text-align:left; }
+        .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold);text-align:center; }
         #toast { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
         .modal { display:none;position:fixed;z-index:7000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6); }
@@ -405,7 +405,13 @@ const WEEK_RANGES = {
     5:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:31} ]
 };
 
-const PARTIAL_FREE_ROUTINES = { "곰돌": ["기상시간 5시"] };
+// 부분 자유일 — 특정 루틴만 자유 처리
+// 곰돌: 주말 기상시간만 자유
+// 날위한나: 금/토 취침시간만 자유
+const PARTIAL_FREE_ROUTINES = {
+    "곰돌":    { days:[0,6],   routines:["기상시간 5시"] },
+    "날위한나": { days:[5,6],   routines:["취침시간 11시 이전"] }
+};
 
 const BADGE_STREAK = [
     { icon:'🌱', label:'새싹',  days:3,  cond:'3일 연속 기록'  },
@@ -720,21 +726,47 @@ function getLatestSAdmin(name,date,routine){
     return '';
 }
 
+// 요일명 → getDay() 인덱스
+const DAY_IDX = {일:0, 월:1, 화:2, 수:3, 목:4, 금:5, 토:6};
+
 function getFreeDayType(name,ds){
-    const note=(MEMBERS[name]?.note||"").toLowerCase();
-    if(note.includes("없음")) return false;
-    const d=new Date(ds).getDay();
+    const note=(MEMBERS[name]?.note||"").trim();
+    if(!note) return false;
+
+    const d=new Date(ds).getDay(); // 0=일, 6=토
     const allHol=[...MONTH_CONFIG[5].holidays,...MONTH_CONFIG[6].holidays];
     const isHol=allHol.includes(ds);
-    let isFree=false;
-    if((note.includes("주말&연휴")||note.includes("주말&연휴 루틴 자유"))&&(d===0||d===6||isHol)) isFree=true;
-    else if(note.includes("주말 루틴 자유")&&(d===0||d===6)) isFree=true;
-    else if(note.includes("일요일 루틴 자유")&&d===0) isFree=true;
-    else if(note.includes("주말 기상")&&(d===0||d===6)) isFree=true;
-    if(!isFree) return false;
-    if(PARTIAL_FREE_ROUTINES[name]) return 'partial';
-    if(note.includes("주말 기상")&&!note.includes("루틴 자유")) return 'info';
-    return 'full';
+
+    // 확정된 6가지 패턴만 인식
+    switch(note){
+        case "없음":
+        case "운영자 루틴":
+            return false;
+
+        case "주말&연휴":
+            return (d===0||d===6||isHol) ? 'full' : false;
+
+        case "주말":
+            return (d===0||d===6) ? 'full' : false;
+
+        case "일요일":
+            return d===0 ? 'full' : false;
+
+        case "화요일":
+            return d===2 ? 'full' : false;
+
+        case "주말기상":
+            // 기상시간 루틴만 토/일 자유 (partial)
+            return (d===0||d===6) ? 'partial' : false;
+
+        case "금토취침":
+            // 취침시간 루틴만 금/토 자유 (partial)
+            return (d===5||d===6) ? 'partial' : false;
+
+        default:
+            // 정해진 패턴 외 값은 자유없음 (주말 기상 7시30분 등)
+            return false;
+    }
 }
 
 // ============================================================
@@ -833,7 +865,9 @@ function autoSaveFreeDay(name){
     if(autoSaveDate[today]?.[name]) return;
     const freeType=getFreeDayType(name,today);
     if(!freeType) return;
-    const partialList=PARTIAL_FREE_ROUTINES[name]||[];
+    // PARTIAL_FREE_ROUTINES 새 구조: {days, routines}
+    const partialEntry=PARTIAL_FREE_ROUTINES[name];
+    const partialList=partialEntry ? partialEntry.routines : [];
     MEMBERS[name].items.forEach(r=>{
         const isAutoPass=(freeType==='full')||(freeType==='partial'&&partialList.includes(r));
         if(!isAutoPass) return;
@@ -965,7 +999,9 @@ function calcStreak(name){
 function renderRoutineList(name){
     const items=MEMBERS[name].items;
     const freeType=getFreeDayType(name,selectedDate);
-    const partialList=PARTIAL_FREE_ROUTINES[name]||[];
+    // PARTIAL_FREE_ROUTINES 새 구조: {days, routines}
+    const partialEntry=PARTIAL_FREE_ROUTINES[name];
+    const partialList=partialEntry ? partialEntry.routines : [];
     let html='';
     items.forEach(r=>{
         const s=getLatestS(name,selectedDate,r);
@@ -988,10 +1024,10 @@ function renderRoutineList(name){
     if(fnEl){
         if(freeType==='full'||freeType==='partial'){
             fnEl.style.textAlign='center';
-            fnEl.innerHTML='주말·연휴 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>자유일에도 실천했다면 오른쪽 ⭐를 눌러 기록해 주세요.';
+            fnEl.innerHTML='📢 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>자유일에도 실천했다면 오른쪽 ⭐를 눌러 기록해 주세요.';
         } else {
             fnEl.style.textAlign='center';
-            fnEl.innerHTML='📢 자유일에도 실천하면 ⭐로 기록해 주세요!';
+            fnEl.innerHTML=''; // 비자유일: 문구 없음
         }
     }
 }
