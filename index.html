@@ -791,7 +791,9 @@ function loadUser(){
     const name=currentUser; if(!name||!MEMBERS[name]) return;
     document.getElementById('userArea').style.display='block';
     document.getElementById('span-name').innerText=name;
-    document.getElementById('personal-note').innerText="📌 "+name+"님의 개인 수칙: "+(MEMBERS[name].note||"없음");
+    // H열 noteDisplay 우선 표시, 없으면 G열 note 사용
+    const noteText = MEMBERS[name].noteDisplay || MEMBERS[name].note || "없음";
+    document.getElementById('personal-note').innerText="📌 "+name+"님의 개인 수칙: "+noteText;
     checkMissingAlert(name); // 4. 미기록 알림
     calcStats(name);
     renderRoutineList(name);
