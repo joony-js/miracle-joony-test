@@ -41,7 +41,7 @@
         .loading-stars { font-size:20px;margin-bottom:14px;letter-spacing:5px;color:var(--gold); }
 
         /* HEADER */
-        .header { background:var(--navy-dark);color:var(--gold);padding:13px 16px;text-align:center;font-weight:900;font-size:15px;position:sticky;top:0;z-index:1000;letter-spacing:1.5px;border-bottom:1.5px solid rgba(241,196,15,0.22); }
+        .header { background:var(--navy-dark);color:var(--gold);padding:13px 16px;text-align:center;font-weight:900;font-size:15px;position:relative;letter-spacing:1.5px;border-bottom:1.5px solid rgba(241,196,15,0.22); } /* 2. sticky 제거 */
         .header-sub { font-size:11px;color:rgba(241,196,15,0.55);font-weight:600;margin-top:2px;letter-spacing:0; }
         /* 3. 자정 카운트다운 */
         .header-countdown { font-size:11px;color:rgba(255,255,255,0.7);font-weight:700;margin-top:3px;letter-spacing:0; }
@@ -163,7 +163,7 @@
         .btn-xls { background:linear-gradient(135deg,#1a6a40,#27ae60); }
         #admin-table { width:100%;border-collapse:collapse;font-size:11px;text-align:center;background:#fff; }
         #admin-table th,#admin-table td { border:1px solid #e4dfcc;padding:5px 2px;min-width:26px; }
-        #admin-table th { background:var(--cream2);padding:8px 2px;font-size:10px;color:var(--navy);font-weight:900; }
+        #admin-table th { background:var(--cream2);padding:8px 2px;font-size:10px;color:var(--navy);font-weight:900;position:sticky;top:0;z-index:10; } /* 3. 날짜 행 고정 */
         .member-divider { border-top:2px solid var(--navy)!important; }
         .clickable-cell { cursor:pointer; }
         .clickable-cell:hover { background:var(--gold-light)!important; }
@@ -237,10 +237,19 @@
 <!-- 7. 헤더 미기록 알림 제거 — missing-alert display:none -->
 <div id="missing-alert"></div>
 
-<div class="quote-area">
-    <div class="quote-text" id="quote-text">명언 로딩 중...</div>
-    <div class="quote-author" id="quote-author"></div>
-    <div class="current-date" id="display-date"></div>
+<div class="quote-area" id="quote-area-wrap">
+    <div id="quote-content">
+        <div class="quote-text" id="quote-text">명언 로딩 중...</div>
+        <div class="quote-author" id="quote-author"></div>
+        <div class="current-date" id="display-date"></div>
+    </div>
+    <!-- 3. 접기/펼치기 버튼 -->
+    <div style="text-align:right;margin-top:8px;">
+        <button id="quote-toggle-btn" onclick="toggleQuote()"
+            style="background:none;border:none;color:var(--gold-dim);font-size:12px;font-weight:700;cursor:pointer;padding:2px 6px;">
+            ▲ 접기
+        </button>
+    </div>
 </div>
 
 <div class="nav">
@@ -342,7 +351,7 @@
             <button class="admin-btn btn-xls" onclick="exportXls()">📈 엑셀 저장</button>
         </div>
         <div id="absence-alert" style="margin-bottom:12px;"></div>
-        <div class="card" id="capture-area" style="overflow:auto;padding:10px;border:2px solid var(--navy);">
+        <div class="card" id="capture-area" style="overflow:auto;padding:10px;border:2px solid var(--navy);max-height:70vh;">
             <table id="admin-table"></table>
         </div>
         <div style="font-size:11px;color:var(--text-sub);margin-top:8px;text-align:center;">셀 클릭 시 상태 수정 | 🔥잘함 ⚠️보통 🆘주의 💤미기록</div>
@@ -565,9 +574,10 @@ function updateCountdown(){
 // 초기화
 // ============================================================
 function initUI(){
-    const hEl = document.querySelector('.header');
-    const qEl = document.querySelector('.quote-area');
-    if(hEl && qEl){ qEl.style.position='sticky'; qEl.style.top=hEl.offsetHeight+'px'; qEl.style.zIndex='899'; }
+    // 2. quote-area sticky 제거 — 헤더/명언 포함 전체 스크롤
+    // const hEl = document.querySelector('.header');
+    // const qEl = document.querySelector('.quote-area');
+    // if(hEl && qEl){ qEl.style.position='sticky'; qEl.style.top=hEl.offsetHeight+'px'; qEl.style.zIndex='899'; }
 
     const sel=document.getElementById('userSelect');
     sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
@@ -1258,9 +1268,35 @@ function renderMonthlyFlowChart(name){
 // ============================================================
 // 탭 전환
 // ============================================================
+// 3. 명언 접기/펼치기
+function toggleQuote(){
+    const content=document.getElementById('quote-content');
+    const btn=document.getElementById('quote-toggle-btn');
+    const wrap=document.getElementById('quote-area-wrap');
+    if(!content||!btn) return;
+    if(content.style.display==='none'){
+        content.style.display='block';
+        btn.innerText='▲ 접기';
+        wrap.style.padding='20px 18px';
+    } else {
+        content.style.display='none';
+        btn.innerText='▼ 펼치기';
+        wrap.style.padding='6px 18px';
+    }
+}
+
 function showTab(tab){
     if(tab==='admin'){
         if(!adminAuthed){ const pw=prompt("관리자 비밀번호를 입력하세요"); if(pw!==ADMIN_PW){ showToast("비밀번호가 틀렸습니다."); return; } adminAuthed=true; }
+        // 3. 관리자 탭 진입 시 명언 자동 접기
+        const qContent=document.getElementById('quote-content');
+        const qBtn=document.getElementById('quote-toggle-btn');
+        const qWrap=document.getElementById('quote-area-wrap');
+        if(qContent&&qContent.style.display!=='none'){
+            qContent.style.display='none';
+            if(qBtn) qBtn.innerText='▼ 펼치기';
+            if(qWrap) qWrap.style.padding='6px 18px';
+        }
         renderAdmin();
     }
     if(tab==='cal'){
