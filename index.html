@@ -213,7 +213,7 @@
     <div class="pw-box">
         <div class="pw-stars">✦ ✦ ✦</div>
         <div class="pw-title">미라클 주니 통합센터</div>
-        <div class="pw-sub">21기 · 2026.6.1 ~ 6.30</div>
+        <div class="pw-sub">21기 · 2026.7.1 ~ 7.31</div>
         <input class="pw-input" id="pw-input" type="password" placeholder="비밀번호 입력"
             maxlength="20" onkeydown="if(event.key==='Enter') checkAppPw()">
         <button class="pw-btn" onclick="checkAppPw()">✦ 입장하기</button>
@@ -230,7 +230,7 @@
 
 <div class="header">
     ✦ 미라클 주니 통합센터 ✦
-    <div class="header-sub">21기 · 2026.6.1 ~ 6.30</div>
+    <div class="header-sub">21기 · 2026.7.1 ~ 7.31</div>
     <!-- 3. 자정 카운트다운 -->
     <div class="header-countdown" id="header-countdown"></div>
 </div>
@@ -378,9 +378,10 @@ const APP_PASSWORD = "1234"; // 2. 앱 입장 비밀번호 내장
 
 const MONTH_CONFIG = {
     5:{ year:2026, monthIdx:4, days:31, str:"2026-05", label:"5월", holidays:["2026-05-05","2026-05-25"] },
-    6:{ year:2026, monthIdx:5, days:30, str:"2026-06", label:"6월", holidays:["2026-06-03","2026-06-06"] }
+    6:{ year:2026, monthIdx:5, days:30, str:"2026-06", label:"6월", holidays:["2026-06-03","2026-06-06"] },
+    7:{ year:2026, monthIdx:6, days:31, str:"2026-07", label:"7월", holidays:["2026-07-17"] }
 };
-const ALL_MONTHS = [5, 6];
+const ALL_MONTHS = [5, 6, 7];
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
 const O_CHEERS = [
@@ -402,7 +403,9 @@ const SAVE_CHEERS = [
 
 const WEEK_RANGES = {
     6:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:30} ],
-    5:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:31} ]
+    5:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:31} ],
+    7:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:31} ]
+};
 };
 
 // 부분 자유일 — 특정 루틴만 자유 처리
@@ -1396,7 +1399,7 @@ function capture(){
     area.style.overflow='visible';
     html2canvas(area, {scrollY:-window.scrollY, windowHeight:area.scrollHeight}).then(c=>{
         const l=document.createElement('a');
-        l.download='미라클주니_21기_'+adminMonth+'월_'+getTodayStr()+'.png';
+        l.download='미라클주니_22기_'+adminMonth+'월_'+getTodayStr()+'.png';
         l.href=c.toDataURL(); l.click();
         // 원래 상태 복원
         area.style.maxHeight=origMaxH;
@@ -1406,7 +1409,7 @@ function capture(){
         area.style.overflow=origOverflow;
     });
 }
-function exportXls(){ const wb=XLSX.utils.table_to_book(document.getElementById('admin-table')); XLSX.writeFile(wb,'미라클주니_21기_'+adminMonth+'월_'+getTodayStr()+'.xlsx'); }
+function exportXls(){ const wb=XLSX.utils.table_to_book(document.getElementById('admin-table')); XLSX.writeFile(wb,'미라클주니_22기_'+adminMonth+'월_'+getTodayStr()+'.xlsx'); }
 
 // ===== 시작 =====
 loadAllData();
