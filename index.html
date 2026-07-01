@@ -372,23 +372,23 @@
 // ============================================================
 // 상수
 // ============================================================
-const API = "https://script.google.com/macros/s/AKfycbzPm7_30HAT87RM60Ii1X1mzGxGp8CljHTvwbHPNACQ_Eq6et-hqVzVhN8p9OD8zwuNpg/exec";
+const API = "https://script.google.com/macros/s/AKfycbwv0ibavy31OSt4p3x3zB5sLEDZHh1ozTNYZXhsDOI/dev";
 const ADMIN_PW = "4120";
 const APP_PASSWORD = "1234"; // 2. 앱 입장 비밀번호 내장
 
-const MONTH_CONFIG = {
+let MONTH_CONFIG = { // GAS 기수설정 시트로 override 가능
     5:{ year:2026, monthIdx:4, days:31, str:"2026-05", label:"5월", holidays:["2026-05-05","2026-05-25"] },
     6:{ year:2026, monthIdx:5, days:30, str:"2026-06", label:"6월", holidays:["2026-06-03","2026-06-06"] },
     7:{ year:2026, monthIdx:6, days:31, str:"2026-07", label:"7월", holidays:["2026-07-17"] }
 };
-const ALL_MONTHS = [5, 6, 7];
+let ALL_MONTHS = [5, 6, 7]; // GAS 기수설정 시트로 override 가능
 
-// ★ 현재 기수 월 (22기=7월) — 모든 날짜 계산의 기준
-const CURRENT_MONTH = 7;
-const CURRENT_MONTH_STR = "2026-07";       // YYYY-MM
-const CURRENT_FIRST_DAY = "2026-07-01";    // 기수 시작일
-// ★ 직전 월 (관리자 탭에서 과거 기록 조회용) — db5(과거월) 데이터가 담김
-const PREV_MONTH = 6;
+// ★ 현재 기수 — GAS 기수설정 시트로 override 됨 (기본값=22기 7월)
+let CURRENT_MONTH = 7;
+let CURRENT_MONTH_STR = "2026-07";
+let CURRENT_FIRST_DAY = "2026-07-01";
+let CURRENT_SEASON_LABEL = "22기";
+let CURRENT_SEASON_PERIOD = "2026.7.1 ~ 7.31";
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
 const O_CHEERS = [
@@ -414,6 +414,64 @@ const WEEK_RANGES = {
     7:[ {label:"1주",start:1,end:7},{label:"2주",start:8,end:14},{label:"3주",start:15,end:21},{label:"4주",start:22,end:28},{label:"5주",start:29,end:31} ]
 };
 
+// WEEK_RANGES 자동 계산 — days 수 기준으로 1~5주 자동 분할
+function computeWeekRanges(days){
+    const ranges=[];
+    let start=1;
+    for(let w=1;start<=days;w++){
+        const end=Math.min(start+6,days);
+        ranges.push({label:w+'주',start,end});
+        start=end+1;
+    }
+    return ranges;
+}
+
+// GAS 기수설정 시트 데이터로 MONTH_CONFIG 등 동적 초기화
+function initSeasonData(seasonArr){
+    if(!seasonArr||!seasonArr.length) return;
+    // MONTH_CONFIG 재구성
+    const newConfig={};
+    const newAllMonths=[];
+    const newWeekRanges={};
+    let currentFound=false;
+    seasonArr.forEach(s=>{
+        const mNum=parseInt(s.monthPrefix.split("-")[1],10);
+        const daysInMonth=new Date(parseInt(s.monthPrefix.split("-")[0]),mNum,0).getDate();
+        newConfig[mNum]={
+            year:parseInt(s.monthPrefix.split("-")[0]),
+            monthIdx:mNum-1,
+            days:daysInMonth,
+            str:s.monthPrefix,
+            label:s.label||mNum+'월',
+            holidays:s.holidays||[]
+        };
+        newAllMonths.push(mNum);
+        newWeekRanges[mNum]=computeWeekRanges(daysInMonth);
+        if(s.isCurrent){
+            CURRENT_MONTH=mNum;
+            CURRENT_MONTH_STR=s.monthPrefix;
+            CURRENT_FIRST_DAY=s.startDate;
+            CURRENT_SEASON_LABEL=s.seasonName||s.label||mNum+'월';
+            CURRENT_SEASON_PERIOD=s.startDate.replace(/^2026-/,'').replace(/-/,'.')
+                +' ~ '+s.endDate.replace(/^2026-/,'').replace(/-/,'.');
+            currentFound=true;
+        }
+    });
+    MONTH_CONFIG=newConfig;
+    ALL_MONTHS=newAllMonths.sort((a,b)=>a-b);
+    WEEK_RANGES=newWeekRanges;
+    // 헤더/라벨 동적 업데이트
+    const seasonText=CURRENT_SEASON_LABEL+' · '+CURRENT_SEASON_PERIOD;
+    document.querySelectorAll('.header-sub').forEach(el=>el.innerText=seasonText);
+    const pwSub=document.querySelector('.pw-sub');
+    if(pwSub) pwSub.innerText=seasonText;
+    const loadTxt=document.querySelector('.loading-text');
+    if(loadTxt) loadTxt.innerText='⏱ 미라클 주니 '+CURRENT_SEASON_LABEL;
+    const adminTitle=document.querySelector('#sec-admin h3');
+    if(adminTitle) adminTitle.innerText='📊 '+CURRENT_SEASON_LABEL+' 실시간 통합 현황';
+    if(!currentFound) console.warn("기수설정 시트에 현재여부=Y 행이 없습니다.");
+}
+
 // 부분 자유일 — 특정 루틴만 자유 처리
 // 곰돌: 주말 기상시간만 자유
 // 날위한나: 금/토 취침시간만 자유
@@ -433,7 +491,8 @@ const BADGE_STREAK = [
 // ============================================================
 // 상태
 // ============================================================
-let db=[], db5=[], MEMBERS={}, QUOTES={};
+let db=[], MEMBERS={}, QUOTES={};
+let dbCache={}; // 비현재월 기록 캐시 { monthNum: records[] }
 let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
 let viewingPrevMonth=false, calMonth=CURRENT_MONTH, adminMonth=CURRENT_MONTH;
 let autoSaveDate={};
@@ -493,6 +552,8 @@ async function fetchAllData(timeout=5000){
         if(allRes.members) MEMBERS = allRes.members;
         if(allRes.quotes)  QUOTES  = allRes.quotes;
         if(Array.isArray(allRes.records)) db = allRes.records;
+        // 2. 기수설정 시트 데이터로 동적 초기화
+        if(Array.isArray(allRes.seasons)&&allRes.seasons.length>0) initSeasonData(allRes.seasons);
         return true;
     } else {
         // type=all 미지원 시 개별 호출 fallback
@@ -563,6 +624,16 @@ function fetchRecords(){
         .catch(()=>{});
 }
 
+// 비현재월 기록 로딩 — dbCache에 저장
+async function loadMonthData(m){
+    if(m===CURRENT_MONTH) return; // 현재월은 db에 있음
+    if(dbCache[m]&&dbCache[m].length>0) return; // 이미 로딩됨
+    const d=await fetchWithTimeout(API+"?type=records&month="+m+"&v="+Date.now(),8000)
+        .catch(()=>({result:"error"}));
+    if(d.result==="success"&&Array.isArray(d.records)) dbCache[m]=d.records;
+    else dbCache[m]=dbCache[m]||[]; // 빈 배열로 초기화(재요청 방지)
+}
+
 function showLoading(show){
     const el=document.getElementById('loading-overlay');
     el.style.opacity=show?'1':'0';
@@ -631,15 +702,8 @@ function changeCalMonth(delta){
     const ni=avail.indexOf(calMonth)+delta;
     if(ni<0||ni>=avail.length) return;
     calMonth=avail[ni]; updateCalNavButtons();
-    // 과거월로 이동 시 db5 자동 로딩 후 달력 표시
-    if(calMonth===PREV_MONTH && db5.length===0){
-        fetchWithTimeout(API+"?type=records&month="+PREV_MONTH+"&v="+Date.now(), 8000)
-            .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db5=d.records; })
-            .catch(()=>{})
-            .finally(()=>renderGrid(currentUser));
-    } else {
-        renderGrid(currentUser);
-    }
+    // 비현재월로 이동 시 dbCache에 로딩 후 달력 표시
+    loadMonthData(calMonth).then(()=>renderGrid(currentUser));
 }
 
 function updateCalNavButtons(){
@@ -715,12 +779,21 @@ function getLatestS(name,date,routine){
     if(rows.length) return rows[rows.length-1].status;
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
+    // 3. 루틴 변경일: 해당 날짜가 루틴 세트 변경 이전이면 BEFORE_START
+    const rcd=MEMBERS[name]?.routineChangeDate;
+    if(rcd&&date<rcd) return 'BEFORE_START';
     return '';
 }
 
-// 1. 달력 탭용 — calMonth에 따라 db 또는 db5 참조
+// 달력/관리자용 — 해당 월에 맞는 pool 반환
+function getPoolForMonth(m){
+    if(m===CURRENT_MONTH) return db;
+    return dbCache[m] || [];
+}
+
+// 달력 탭용 — calMonth 기준 pool 참조
 function getLatestSGrid(name,date,routine){
-    const pool = calMonth===PREV_MONTH ? db5 : db;
+    const pool = getPoolForMonth(calMonth);
     const rows=pool.filter(r=>{
         if(r.name!==name||r.routine!==routine) return false;
         return String(r.date).substring(0,10)===date;
@@ -728,18 +801,24 @@ function getLatestSGrid(name,date,routine){
     if(rows.length) return rows[rows.length-1].status;
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
+    // 3. 루틴 변경일 체크
+    const rcd=MEMBERS[name]?.routineChangeDate;
+    if(rcd&&date<rcd) return 'BEFORE_START';
     return '';
 }
 
 function getLatestSAdmin(name,date,routine){
-    const pool=adminMonth===PREV_MONTH?db5:db;
+    const pool=getPoolForMonth(adminMonth);
     const rows=pool.filter(r=>{
         if(r.name!==name||r.routine!==routine) return false;
-        return String(r.date).substring(0,10)===date; // 5. 날짜 정규화
+        return String(r.date).substring(0,10)===date;
     });
     if(rows.length) return rows[rows.length-1].status;
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
+    // 3. 루틴 변경일 체크
+    const rcd=MEMBERS[name]?.routineChangeDate;
+    if(rcd&&date<rcd) return 'BEFORE_START';
     return '';
 }
 
@@ -751,7 +830,7 @@ function getFreeDayType(name,ds){
     if(!note) return false;
 
     const d=new Date(ds).getDay(); // 0=일, 6=토
-    const allHol=[...MONTH_CONFIG[5].holidays,...MONTH_CONFIG[6].holidays];
+    const allHol = ALL_MONTHS.flatMap(m => MONTH_CONFIG[m]?.holidays || []);
     const isHol=allHol.includes(ds);
 
     // 확정된 6가지 패턴만 인식
@@ -1034,11 +1113,13 @@ function renderRoutineList(name){
         const s=getLatestS(name,selectedDate,r);
         if(s==='BEFORE_START'){ html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">시작 전</span></span></div>`; return; }
         if(freeType==='full'){
-            const isVol=s==='⭐';
-            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">자유일</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn btn-volunteer-star ${isVol?'active':''}" onclick="save('${name}','${r}','${isVol?'':'⭐'}')">⭐</button></div></div>`;
+            // 4. 자유일: O 버튼으로 통일 (⭐ 제거)
+            const isO=(s==='O'||s==='⭐'); // 기존 ⭐도 O로 표시
+            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">자유일</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn O ${isO?'active':''}" onclick="save('${name}','${r}','${isO?'':'O'}')">O</button></div></div>`;
         } else if(freeType==='partial'&&partialList.includes(r)){
-            const isVol=s==='⭐';
-            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">기상 자유</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn btn-volunteer-star ${isVol?'active':''}" onclick="save('${name}','${r}','${isVol?'':'⭐'}')">⭐</button></div></div>`;
+            // 4. partial 자유일도 O 버튼으로 통일
+            const isO=(s==='O'||s==='⭐');
+            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">기상 자유</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn O ${isO?'active':''}" onclick="save('${name}','${r}','${isO?'':'O'}')">O</button></div></div>`;
         } else if(freeType==='info'&&r.startsWith('기상시간')){
             html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">주말 기상 자유</span></span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
         } else {
@@ -1051,7 +1132,7 @@ function renderRoutineList(name){
     if(fnEl){
         if(freeType==='full'||freeType==='partial'){
             fnEl.style.textAlign='center';
-            fnEl.innerHTML='📢 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>자유일에도 실천했다면 오른쪽 ⭐를 눌러 기록해 주세요.';
+            fnEl.innerHTML='📢 자유 루틴으로 설정된 항목은 자동으로 패스 처리됩니다.<br>자유일에도 실천했다면 오른쪽 O를 눌러 기록해 주세요.';
         } else {
             fnEl.style.textAlign='center';
             fnEl.innerHTML=''; // 비자유일: 문구 없음
@@ -1066,7 +1147,7 @@ async function save(name,routine,status){
     db=db.filter(r=>!(r.name===name&&r.date===selectedDate&&r.routine===routine));
     if(status!=='') db.push({date:selectedDate,name,routine,status});
     if(status==='O'){ showConfetti(); showToast(randItem(O_CHEERS)); }
-    else if(status==='⭐'){ showConfetti(); showToast("⭐ 자유일에도 실천! 대단해요!"); }
+    // 4. ⭐ 상태 저장 제거 — O로 통일 (기존 ⭐ 데이터는 O와 동일하게 표시됨)
     else { showToast(randItem(SAVE_CHEERS)); }
     fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date:selectedDate,name,routine,status})});
     loadUser(); renderTodaySummary();
@@ -1140,11 +1221,8 @@ function setAdminMonth(m){
     adminMonth=m;
     document.getElementById('adm-btn-may').className='month-btn'+(m===PREV_MONTH?' active':'');
     document.getElementById('adm-btn-jun').className='month-btn'+(m===CURRENT_MONTH?' active':'');
-    if(m===PREV_MONTH&&db5.length===0){
-        fetchWithTimeout(API+"?type=records&month="+PREV_MONTH+"&v="+Date.now(),8000)
-            .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db5=d.records; })
-            .catch(()=>{}).finally(()=>renderAdmin());
-    } else { renderAdmin(); }
+    // 비현재월 선택 시 dbCache 로딩 후 렌더
+    loadMonthData(m).then(()=>renderAdmin());
 }
 
 function renderAdmin(){
@@ -1177,9 +1255,14 @@ function renderAdmin(){
                 let disp=s,bg='',cl='clickable-cell',oc=`onclick="quickSave('${n}','${r}','${ds}','${s}')"`;
                 if(s==='BEFORE_START'){disp='이전';bg='#f8f6f0';cl='';oc='';}
                 else if(s==='O') bg='#dcfce7';
-                else if(s==='⭐'){disp='⭐';bg='var(--gold-light)';}
+                else if(s==='⭐'){disp='O';bg='#dcfce7';} // 4. 기존 ⭐ → O로 표시
                 else if(s==='X') bg='#fee2e2';
-                else if(s==='-'){disp='패스';bg='#f3f4f6';}
+                else if(s==='-'){
+                    // 4. 자유일의 '-'(자동패스) → '자유', 비자유일 '-' → '패스'
+                    const ft4=getFreeDayType(n,ds);
+                    if(ft4==='full'||(ft4==='partial')){ disp='자유'; bg='#f3f4f6'; }
+                    else { disp='패스'; bg='#f3f4f6'; }
+                }
                 else if(ds<today){ const ft=getFreeDayType(n,ds); if(ft==='full'){disp='자유';bg='#f3f4f6';} else bg='var(--gold-light)'; }
                 h+=`<td class="${cl} ${idx===0?dc:''}" style="background:${bg}" ${oc}>${disp||''}</td>`;
             }
@@ -1211,7 +1294,7 @@ function openDayModal(name,date){
         const isFreeRoutine=(freeType==='full')||(freeType==='partial'&&partialList.includes(r));
         let label, color;
         if(s==='O'){ label='O'; color='var(--ok)'; }
-        else if(s==='⭐'){ label='⭐ 자발 실천'; color='var(--ok)'; }
+        else if(s==='⭐'){ label='O'; color='var(--ok)'; } // 4. 기존 ⭐ → O로 표시
         else if(s==='X'){ label='X'; color='var(--no)'; }
         else if(s==='-'){ label='패스'; color='#9a9890'; }
         else if(s==='BEFORE_START'){ label='시작 전'; color='#9a9890'; }
@@ -1382,15 +1465,10 @@ function showTab(tab){
         if(!MONTH_CONFIG[calMonth]) calMonth=CURRENT_MONTH;
         if(currentUser){ const joinM=getMemberJoinMonth(currentUser); if(calMonth<joinM) calMonth=joinM; }
         updateCalNavButtons();
-        // 과거월 달력 진입 시 db5 로딩 보장
-        if(calMonth===PREV_MONTH && db5.length===0){
-            fetchWithTimeout(API+"?type=records&month="+PREV_MONTH+"&v="+Date.now(), 8000)
-                .then(d=>{ if(d.result==="success"&&Array.isArray(d.records)) db5=d.records; })
-                .catch(()=>{})
-                .finally(()=>{ renderGrid(currentUser); renderWeeklyFlowTable(currentUser); renderMonthlyFlowChart(currentUser); });
-        } else {
+        // 비현재월 달력 진입 시 dbCache 로딩 보장
+        loadMonthData(calMonth).then(()=>{
             renderGrid(currentUser); renderWeeklyFlowTable(currentUser); renderMonthlyFlowChart(currentUser);
-        }
+        });
     }
     ['home','cal','admin'].forEach(t=>{
         document.getElementById('sec-'+t).style.display=t===tab?'block':'none';
