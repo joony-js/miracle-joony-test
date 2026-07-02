@@ -139,14 +139,14 @@
         /* 요일 헤더 */
         .cal-day-header { display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px; }
         .cal-day-header-cell { text-align:center;font-size:11px;font-weight:900;padding:5px 0;border-radius:6px;background:#3b4a6b;color:#fff; }
-        .cal-day-header-cell.sun { background:#3b4a6b;color:#ffb3b3; } /* 일요일: 연한 빨강 */
-        .cal-day-header-cell.sat { background:#3b4a6b;color:#a8d4ff; } /* 토요일: 연한 파랑 */
+        .cal-day-header-cell.sun { background:#ffcccc;color:#c0392b; }
+        .cal-day-header-cell.sat { background:#cce5ff;color:#2471a3; }
         /* 빈 칸 (1일 전 공백) */
         .day-cell-empty { min-height:52px;border-radius:10px;background:#f0f0f0;border:none; } /* 빈 칸: 연한 회색 */
         .day-cell { min-height:52px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:1px solid #e0ddd4;background:#fff;cursor:pointer;line-height:1.3;transition:all 0.15s;padding:3px 2px;color:#2d2d2d; }
         .day-cell:hover { transform:scale(1.04);z-index:2;border-color:var(--navy); }
-        .day-cell.sun { color:#c0392b;background:#fff; }
-        .day-cell.sat { color:#2471a3;background:#fff; }
+        .day-cell.sun { color:#c0392b;background:#fff0f0; }
+        .day-cell.sat { color:#2471a3;background:#f0f8ff; }
         .day-cell.holiday { color:#c0392b; }
         .day-cell.selected { border:2.5px solid var(--navy); }
         .day-cell.today-mark { box-shadow:0 0 0 2.5px var(--gold); }
