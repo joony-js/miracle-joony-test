@@ -372,7 +372,7 @@
 // ============================================================
 // 상수
 // ============================================================
-const API = "https://script.google.com/macros/s/AKfycbz8IMjccmKRvSqS9fsGqfVB4ZPP_XH4g_6mKRVjvZ8lANmPt80wg4KhJ6fm4KgumfJA/exec";
+const API = "https://script.google.com/macros/s/AKfycbzPm7_30HAT87RM60Ii1X1mzGxGp8CljHTvwbHPNACQ_Eq6et-hqVzVhN8p9OD8zwuNpg/exec";
 const ADMIN_PW = "4120";
 const APP_PASSWORD = "1234"; // 2. 앱 입장 비밀번호 내장
 
@@ -389,6 +389,7 @@ let CURRENT_MONTH_STR = "2026-07";
 let CURRENT_FIRST_DAY = "2026-07-01";
 let CURRENT_SEASON_LABEL = "22기";
 let CURRENT_SEASON_PERIOD = "2026.7.1 ~ 7.31";
+let PREV_MONTH = 6; // 직전 기수 월 — initSeasonData에서 자동 설정
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
 const O_CHEERS = [
@@ -460,6 +461,9 @@ function initSeasonData(seasonArr){
     MONTH_CONFIG=newConfig;
     ALL_MONTHS=newAllMonths.sort((a,b)=>a-b);
     WEEK_RANGES=newWeekRanges;
+    // PREV_MONTH: 현재월 바로 직전 월 자동 설정
+    const prevIdx=ALL_MONTHS.indexOf(CURRENT_MONTH)-1;
+    if(prevIdx>=0) PREV_MONTH=ALL_MONTHS[prevIdx];
     // 헤더/라벨 동적 업데이트
     const seasonText=CURRENT_SEASON_LABEL+' · '+CURRENT_SEASON_PERIOD;
     document.querySelectorAll('.header-sub').forEach(el=>el.innerText=seasonText);
@@ -469,6 +473,11 @@ function initSeasonData(seasonArr){
     if(loadTxt) loadTxt.innerText='⏱ 미라클 주니 '+CURRENT_SEASON_LABEL;
     const adminTitle=document.querySelector('#sec-admin h3');
     if(adminTitle) adminTitle.innerText='📊 '+CURRENT_SEASON_LABEL+' 실시간 통합 현황';
+    // 버그3: 관리자 탭 월 토글 버튼 텍스트 동적 업데이트
+    const btnPrev=document.getElementById('adm-btn-may');
+    const btnCurr=document.getElementById('adm-btn-jun');
+    if(btnPrev) btnPrev.innerText=(MONTH_CONFIG[PREV_MONTH]?.label||PREV_MONTH+'월')+' 기록';
+    if(btnCurr) btnCurr.innerText=(MONTH_CONFIG[CURRENT_MONTH]?.label||CURRENT_MONTH+'월')+' 기록';
     if(!currentFound) console.warn("기수설정 시트에 현재여부=Y 행이 없습니다.");
 }
 
@@ -665,6 +674,10 @@ function initUI(){
     // const qEl = document.querySelector('.quote-area');
     // if(hEl && qEl){ qEl.style.position='sticky'; qEl.style.top=hEl.offsetHeight+'px'; qEl.style.zIndex='899'; }
 
+    // 기수설정 시트 기반: calMonth/adminMonth를 현재 기수 월로 리셋
+    calMonth = CURRENT_MONTH;
+    adminMonth = CURRENT_MONTH;
+
     const sel=document.getElementById('userSelect');
     sel.innerHTML='<option value="">-- 성함을 선택하세요 --</option>';
     Object.keys(MEMBERS).sort((a,b)=>a==="사랑주니"?-1:b==="사랑주니"?1:a.localeCompare(b,'ko'))
@@ -830,7 +843,7 @@ function getFreeDayType(name,ds){
     if(!note) return false;
 
     const d=new Date(ds).getDay(); // 0=일, 6=토
-    const allHol = ALL_MONTHS.flatMap(m => MONTH_CONFIG[m]?.holidays || []);
+    const allHol=[...MONTH_CONFIG[5].holidays,...MONTH_CONFIG[6].holidays];
     const isHol=allHol.includes(ds);
 
     // 확정된 6가지 패턴만 인식
