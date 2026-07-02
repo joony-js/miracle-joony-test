@@ -138,15 +138,15 @@
         .grid-container { display:grid;grid-template-columns:repeat(7,1fr);gap:3px; }
         /* 요일 헤더 */
         .cal-day-header { display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px; }
-        .cal-day-header-cell { text-align:center;font-size:11px;font-weight:900;padding:4px 0;border-radius:6px;background:var(--cream2);color:var(--text-sub); }
-        .cal-day-header-cell.sun { color:#c0392b; }
-        .cal-day-header-cell.sat { color:#2471a3; }
+        .cal-day-header-cell { text-align:center;font-size:11px;font-weight:900;padding:5px 0;border-radius:6px;background:#3b4a6b;color:#fff; }
+        .cal-day-header-cell.sun { background:#3b4a6b;color:#ffb3b3; } /* 일요일: 연한 빨강 */
+        .cal-day-header-cell.sat { background:#3b4a6b;color:#a8d4ff; } /* 토요일: 연한 파랑 */
         /* 빈 칸 (1일 전 공백) */
-        .day-cell-empty { min-height:52px;border-radius:10px;background:transparent;border:none; }
-        .day-cell { min-height:52px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:1.5px solid #e8e2cc;background:#fff;cursor:pointer;line-height:1.3;transition:all 0.15s;padding:3px 2px;color:var(--text); }
-        .day-cell:hover { transform:scale(1.05);z-index:2; }
-        .day-cell.sun { color:#c0392b;background:#fdf5f5; }
-        .day-cell.sat { color:#2471a3;background:#f0f6fc; }
+        .day-cell-empty { min-height:52px;border-radius:10px;background:#f0f0f0;border:none; } /* 빈 칸: 연한 회색 */
+        .day-cell { min-height:52px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:1px solid #e0ddd4;background:#fff;cursor:pointer;line-height:1.3;transition:all 0.15s;padding:3px 2px;color:#2d2d2d; }
+        .day-cell:hover { transform:scale(1.04);z-index:2;border-color:var(--navy); }
+        .day-cell.sun { color:#c0392b;background:#fff; }
+        .day-cell.sat { color:#2471a3;background:#fff; }
         .day-cell.holiday { color:#c0392b; }
         .day-cell.selected { border:2.5px solid var(--navy); }
         .day-cell.today-mark { box-shadow:0 0 0 2.5px var(--gold); }
@@ -352,8 +352,12 @@
     <div id="sec-admin" style="display:none;">
         <h3 id="admin-season-title" style="margin:0 0 12px 0;font-weight:900;color:var(--navy);text-align:center;font-size:15px;">📊 22기 실시간 통합 현황</h3>
         <!-- 비밀번호 변경 기능 제거 — 깃허브 APP_PASSWORD 상수로 변경 -->
-        <!-- 작업2: 월 버튼 JS에서 동적 생성 -->
-        <div class="month-toggle" id="admin-month-toggle" style="margin-bottom:12px;"></div>
+        <!-- 관리자 월 네비게이터 -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:14px;">
+            <button class="cal-nav-btn" id="admin-month-prev" onclick="moveAdminMonth(-1)">&#8249;</button>
+            <div id="admin-month-label" style="font-size:15px;font-weight:900;color:var(--navy);min-width:120px;text-align:center;">-</div>
+            <button class="cal-nav-btn" id="admin-month-next" onclick="moveAdminMonth(1)">&#8250;</button>
+        </div>
         <div class="admin-controls">
             <button class="admin-btn btn-cap" onclick="capture()">🖼 화면 캡처</button>
             <button class="admin-btn btn-xls" onclick="exportXls()">📈 엑셀 저장</button>
@@ -742,7 +746,20 @@ function setDisplayDate(){
 // ============================================================
 // 가입월 / 달력 월 이동
 // ============================================================
-function getMemberJoinMonth(name){ return MEMBERS[name]?.joinMonth||CURRENT_MONTH; }
+function getMemberJoinMonth(name){
+    const jm=MEMBERS[name]?.joinMonth;
+    if(jm) return jm;
+    // joinMonth 미입력 시 루틴히스토리 시작일로 자동 인식
+    const hist=ROUTINE_HISTORY[name];
+    if(hist&&hist.length>0){
+        const dates=hist.map(h=>h.startDate).filter(Boolean).sort();
+        if(dates.length>0){
+            const earliest=dates[0]; // "YYYY-MM-DD"
+            return parseInt(earliest.split('-')[1],10);
+        }
+    }
+    return CURRENT_MONTH; // 히스토리도 없으면 현재 기수 기준
+}
 function getAvailableMonths(name){ if(!name) return [CURRENT_MONTH]; return ALL_MONTHS.filter(m=>m>=getMemberJoinMonth(name)); }
 
 function changeCalMonth(delta){
@@ -826,7 +843,7 @@ function getLatestS(name,date,routine){
         return String(r.date).substring(0,10)===date;
     });
     // 작업3: ⭐ → O 정규화 (자유일 실천도 O로 통일)
-    if(rows.length){ const s=rows[rows.length-1].status; return s==='⭐'?'O':s; }
+    if(rows.length){ const s=rows[rows.length-1].status; return (s==='⭐'||s==='★')?'O':s; } // ★(특수문자)와 ⭐(이모지) 모두 O로 변환
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
     // 3. 루틴 변경일: 해당 날짜가 루틴 세트 변경 이전이면 BEFORE_START
@@ -849,7 +866,7 @@ function getLatestSGrid(name,date,routine){
         return String(r.date).substring(0,10)===date;
     });
     // 작업3: ⭐ → O 정규화
-    if(rows.length){ const s=rows[rows.length-1].status; return s==='⭐'?'O':s; }
+    if(rows.length){ const s=rows[rows.length-1].status; return (s==='⭐'||s==='★')?'O':s; } // ★(특수문자)와 ⭐(이모지) 모두 O로 변환
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
     // 3. 루틴 변경일 체크
@@ -865,7 +882,7 @@ function getLatestSAdmin(name,date,routine){
         return String(r.date).substring(0,10)===date;
     });
     // 작업3: ⭐ → O 정규화
-    if(rows.length){ const s=rows[rows.length-1].status; return s==='⭐'?'O':s; }
+    if(rows.length){ const s=rows[rows.length-1].status; return (s==='⭐'||s==='★')?'O':s; } // ★(특수문자)와 ⭐(이모지) 모두 O로 변환
     const cfg=MEMBERS[name]?.personalConfig;
     if(cfg&&cfg[routine]&&date<cfg[routine]) return 'BEFORE_START';
     // 3. 루틴 변경일 체크
@@ -1303,7 +1320,7 @@ function renderGrid(name){
         else if(ds<today) bg='var(--gold-light)';
         const dot=(hasEntry&&xCnt===0&&dO>0)?'<div class="streak-dot"></div>':'';
         const star=hasVol?'<div style="font-size:8px">⭐</div>':'';
-        const hol=isHol?'<div style="font-size:8px;color:#c0392b">휴</div>':'';
+        const hol=isHol?'<div style="font-size:8px;color:#c0392b;font-weight:900">휴일</div>':'';
         // 날짜만 표시 (요일 헤더로 이미 표시됨)
         grid.innerHTML+=`<div class="day-cell ${isSun?'sun':''} ${isSat?'sat':''} ${isHol?'holiday':''} ${selectedDate===ds?'selected':''} ${ds===today?'today-mark':''}" style="background:${bg}" onclick="openDayModal('${name}','${ds}')">${i}${hol}${star}${dot}</div>`;
     }
@@ -1322,25 +1339,40 @@ function renderBadges(name){
 // ============================================================
 // 관리자
 // ============================================================
-// 작업2: 관리자 탭 월 버튼 동적 생성
+// 관리자 월 네비게이터
 function renderAdminMonthButtons(){
-    const wrap=document.getElementById('admin-month-toggle');
-    if(!wrap||!ALL_SEASONS.length) return;
-    wrap.innerHTML=ALL_SEASONS.map(s=>{
-        const mNum=parseInt(s.monthPrefix.split('-')[1],10);
-        const isActive=(mNum===adminMonth);
-        const label=(s.label||mNum+'월')+'('+s.seasonName+')';
-        return `<button class="month-btn${isActive?' active':''}" data-month="${mNum}"
-            onclick="setAdminMonth(${mNum})">${label}</button>`;
-    }).join('');
+    // 라벨 업데이트 (최근 기수부터 시작 — adminMonth 기준)
+    updateAdminMonthLabel();
+}
+
+function updateAdminMonthLabel(){
+    const lbl=document.getElementById('admin-month-label');
+    if(!lbl) return;
+    const season=ALL_SEASONS.find(s=>parseInt(s.monthPrefix.split('-')[1],10)===adminMonth);
+    const label=season
+        ? (season.label||adminMonth+'월')+'  ('+season.seasonName+')'
+        : adminMonth+'월';
+    lbl.innerText=label;
+    // 이전/다음 버튼 비활성화 처리
+    const months=ALL_SEASONS.map(s=>parseInt(s.monthPrefix.split('-')[1],10)).sort((a,b)=>a-b);
+    const idx=months.indexOf(adminMonth);
+    const prevBtn=document.getElementById('admin-month-prev');
+    const nextBtn=document.getElementById('admin-month-next');
+    if(prevBtn) prevBtn.disabled=(idx<=0);
+    if(nextBtn) nextBtn.disabled=(idx>=months.length-1);
+}
+
+function moveAdminMonth(delta){
+    const months=ALL_SEASONS.map(s=>parseInt(s.monthPrefix.split('-')[1],10)).sort((a,b)=>a-b);
+    const idx=months.indexOf(adminMonth);
+    const ni=idx+delta;
+    if(ni<0||ni>=months.length) return;
+    setAdminMonth(months[ni]);
 }
 
 function setAdminMonth(m){
     adminMonth=m;
-    // 동적 버튼 active 업데이트
-    document.querySelectorAll('#admin-month-toggle .month-btn').forEach(btn=>{
-        btn.classList.toggle('active', parseInt(btn.dataset.month,10)===m);
-    });
+    updateAdminMonthLabel();
     // 비현재월 선택 시 dbCache 로딩 후 렌더
     loadMonthData(m).then(()=>renderAdmin());
 }
@@ -1356,8 +1388,9 @@ function renderAdmin(){
     const validMembers=[]; // [{name, routines, miss, streak, icon, icls}]
     Object.keys(MEMBERS).forEach(n=>{
         // 가입월 체크: 가입월이 해당 월보다 이후면 제외
+        // (joinMonth 미입력 시 getMemberJoinMonth가 루틴히스토리로 자동 판단)
         const joinM=getMemberJoinMonth(n);
-        if(joinM>m) return;
+        if(joinM>m) return; // 해당 월보다 나중에 가입한 멤버 제외
         // 해당 월 유효 루틴 union
         const routineSet=new Set();
         for(let i=1;i<=days;i++) getRoutinesForDate(n,dateStr(m,i)).forEach(r=>routineSet.add(r));
