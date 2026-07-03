@@ -185,6 +185,11 @@
 
         /* MISC */
         .footer-note { font-size:15px;color:var(--navy);text-align:center;margin-top:10px;font-weight:900;line-height:1.5; }
+        /* AI 코치 — 미라클 메시지 */
+        .miracle-message-card { background:linear-gradient(135deg,#f0f4ff,#e8f0fe);border:1.5px solid rgba(59,74,107,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;position:relative;z-index:1; }
+        .miracle-message-title { font-size:13px;font-weight:900;color:#3b4a6b;margin-bottom:8px;letter-spacing:0.5px; }
+        .miracle-message-text { font-size:14px;font-weight:700;color:#3b4a6b;line-height:1.7;word-break:keep-all; }
+        .miracle-message-loading { font-size:13px;color:#8899bb;font-style:italic; }
         .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold);text-align:center; }
         #toast { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
@@ -285,8 +290,15 @@
             <div class="streak-mini">
                 <div class="streak-main-line" id="streak-main-line">✨ 오늘 첫 기적을 시작해보세요!</div>
                 <div class="streak-sub-line"  id="streak-sub-line"></div>
-                <!-- 4. 미기록 알림: streak-mini 안에 표시 -->
+                <!-- 미기록 알림 -->
                 <div id="missed-alert-inline" class="missed-alert-box" style="display:none;margin-top:10px;"></div>
+            </div>
+            <!-- AI 코치 미라클 메시지 -->
+            <div class="miracle-message-card" id="miracle-message-card" style="display:none;">
+                <div class="miracle-message-title">✨ 미라클 메시지</div>
+                <div class="miracle-message-text" id="miracle-message-text">
+                    <span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>
+                </div>
             </div>
 
             <div class="card">
@@ -961,6 +973,34 @@ function onUserChange(){
 // ============================================================
 // 사용자 화면
 // ============================================================
+// AI 코치 미라클 메시지 로드
+async function fetchMiracleMessage(name){
+    const card=document.getElementById('miracle-message-card');
+    const text=document.getElementById('miracle-message-text');
+    if(!card||!text) return;
+    // 사랑주니(운영자) 제외
+    if(name==='사랑주니'){ card.style.display='none'; return; }
+    card.style.display='block';
+    text.innerHTML='<span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>';
+    try {
+        const res=await fetchWithTimeout(
+            API+"?type=coach&member="+encodeURIComponent(name)+"&v="+Date.now(), 15000
+        );
+        if(res.result==='success'&&res.message){
+            // 정상 메시지 표시
+            text.innerText=res.message;
+        } else if(res.result==='success'&&res.message===null){
+            // null 반환 (사랑주니 등) → 카드 숨김 (null 텍스트 방지)
+            card.style.display='none';
+        } else {
+            // 오류 또는 메시지 없음 → 기본 문구
+            text.innerText='오늘도 함께해요. 작은 실천이 기적을 만들어요. 💛';
+        }
+    } catch(e){
+        text.innerText='오늘도 함께해요. 작은 실천이 기적을 만들어요. 💛';
+    }
+}
+
 function loadUser(){
     const name=currentUser; if(!name||!MEMBERS[name]) return;
     document.getElementById('userArea').style.display='block';
@@ -968,15 +1008,16 @@ function loadUser(){
     // H열 noteDisplay 우선 표시, 없으면 G열 note 사용
     const noteText = MEMBERS[name].noteDisplay || MEMBERS[name].note || "없음";
     document.getElementById('personal-note').innerText="📌 "+name+"님의 개인 수칙: "+noteText;
-    checkMissingAlert(name); // 4. 미기록 알림
+    checkMissingAlert(name);
     calcStats(name);
     renderRoutineList(name);
     renderBadges(name);
     autoSaveFreeDay(name);
-    // 2. updateMyRank 호출 제거
     const badgeCard=document.getElementById('home-badge-card');
     if(badgeCard) badgeCard.style.display='block';
     renderTodayRoutineChart();
+    // AI 코치 미라클 메시지 (비동기, UI를 막지 않음)
+    fetchMiracleMessage(name);
 }
 
 // ============================================================
