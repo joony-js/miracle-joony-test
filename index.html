@@ -292,12 +292,10 @@
                 <div class="streak-sub-line"  id="streak-sub-line"></div>
                 <!-- 미기록 알림 -->
                 <div id="missed-alert-inline" class="missed-alert-box" style="display:none;margin-top:10px;"></div>
-            </div>
-            <!-- AI 코치 미라클 메시지 -->
-            <div class="miracle-message-card" id="miracle-message-card" style="display:none;">
-                <div class="miracle-message-title">✨ 미라클 메시지</div>
-                <div class="miracle-message-text" id="miracle-message-text">
-                    <span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>
+                <!-- AI 코치 미라클 메시지 — streak 박스 안 통합 -->
+                <div id="miracle-message-card" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.25);">
+                    <div style="font-size:12px;font-weight:900;color:var(--gold);margin-bottom:5px;letter-spacing:0.3px;">✨ 미라클 메시지</div>
+                    <div id="miracle-message-text" style="font-size:13px;font-weight:700;color:var(--navy);line-height:1.65;word-break:keep-all;"></div>
                 </div>
             </div>
 
@@ -529,6 +527,7 @@ let ALL_SEASONS=[]; // 전체 기수 목록 (동적 월 버튼용)
 let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
 let viewingPrevMonth=false, calMonth=CURRENT_MONTH, adminMonth=CURRENT_MONTH;
 let autoSaveDate={};
+let lastCoachMember=''; // 마지막으로 코치 메시지를 로드한 멤버명
 // appPassword 변수 제거 — APP_PASSWORD 상수 사용
 
 // ============================================================
@@ -960,6 +959,7 @@ function getFreeDayType(name,ds){
 // ============================================================
 function onUserChange(){
     const name=document.getElementById('userSelect').value; currentUser=name;
+    // lastCoachMember는 이름 비교로 판단하므로 별도 초기화 불필요
     if(name){
         const joinM=getMemberJoinMonth(name);
         if(calMonth<joinM) calMonth=joinM;
@@ -973,13 +973,16 @@ function onUserChange(){
 // ============================================================
 // 사용자 화면
 // ============================================================
-// AI 코치 미라클 메시지 로드
+// AI 코치 미라클 메시지 로드 (멤버 변경 시에만 재호출)
 async function fetchMiracleMessage(name){
     const card=document.getElementById('miracle-message-card');
     const text=document.getElementById('miracle-message-text');
     if(!card||!text) return;
     // 사랑주니(운영자) 제외
     if(name==='사랑주니'){ card.style.display='none'; return; }
+    // 다른 멤버 선택 시에만 재호출 (lastCoachMember !== name)
+    if(lastCoachMember===name) return;
+    lastCoachMember=name; // 먼저 설정 (중복 호출 차단)
     card.style.display='block';
     text.innerHTML='<span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>';
     try {
