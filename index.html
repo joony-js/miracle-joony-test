@@ -206,12 +206,7 @@
         .pw-btn:active { opacity:0.85; }
         .pw-error { font-size:13px;color:var(--no);font-weight:800;margin-top:10px;min-height:18px; }
 
-        /* 관리자 비밀번호 변경 */
-        .pw-change-box { background:var(--cream2);border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid var(--border); }
-        .pw-change-title { font-size:14px;font-weight:900;color:var(--navy);margin-bottom:12px; }
-        .pw-change-row { display:flex;gap:8px;align-items:center; }
-        .pw-change-input { flex:1;padding:12px;font-size:15px;font-weight:700;border:2px solid var(--border);border-radius:10px;background:#fff;color:var(--text); }
-        .pw-change-btn { padding:12px 16px;background:var(--navy);color:var(--gold);border:none;border-radius:10px;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap; }
+        /* pw-change-box: 비밀번호 변경 기능 제거됨 */
     </style>
 </head>
 <body>
@@ -709,10 +704,7 @@ function updateCountdown(){
 // 초기화
 // ============================================================
 function initUI(){
-    // 2. quote-area sticky 제거 — 헤더/명언 포함 전체 스크롤
-    // const hEl = document.querySelector('.header');
-    // const qEl = document.querySelector('.quote-area');
-    // if(hEl && qEl){ qEl.style.position='sticky'; qEl.style.top=hEl.offsetHeight+'px'; qEl.style.zIndex='899'; }
+    // quote-area sticky 제거됨 (전체 스크롤 방식 사용)
 
     // 기수설정 시트 기반: calMonth/adminMonth를 현재 기수 월로 리셋
     if(CURRENT_MONTH){ calMonth = CURRENT_MONTH; adminMonth = CURRENT_MONTH; }
@@ -1213,8 +1205,7 @@ function renderRoutineList(name){
             // 4. partial 자유일도 O 버튼으로 통일
             const isO=(s==='O'); // getter에서 ⭐→O 정규화
             html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">기상 자유</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn O ${isO?'active':''}" onclick="save('${name}','${r}','${isO?'':'O'}')">O</button></div></div>`;
-        } else if(freeType==='info'&&r.startsWith('기상시간')){
-            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">주말 기상 자유</span></span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
+
         } else {
             html+=`<div class="item"><span class="item-name">${r}</span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
         }
@@ -1253,8 +1244,16 @@ async function save(name,routine,status){
 
 async function quickSave(name,routine,date,cur){
     const next=cur==='O'?'X':cur==='X'?'-':cur==='-'?'':'O';
-    db=db.filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
-    if(next!=='') db.push({date,name,routine,status:next});
+    // adminMonth 기준으로 올바른 pool 업데이트
+    if(adminMonth===CURRENT_MONTH){
+        db=db.filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
+        if(next!=='') db.push({date,name,routine,status:next});
+    } else {
+        // 과거월: dbCache 업데이트
+        if(!dbCache[adminMonth]) dbCache[adminMonth]=[];
+        dbCache[adminMonth]=dbCache[adminMonth].filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
+        if(next!=='') dbCache[adminMonth].push({date,name,routine,status:next});
+    }
     renderAdmin();
     fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date,name,routine,status:next})});
 }
