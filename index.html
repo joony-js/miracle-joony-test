@@ -292,8 +292,8 @@
                 <div class="streak-sub-line"  id="streak-sub-line"></div>
                 <!-- 미기록 알림 -->
                 <div id="missed-alert-inline" class="missed-alert-box" style="display:none;margin-top:10px;"></div>
-                <!-- AI 코치 미라클 메시지 — streak 박스 안 통합 -->
-                <div id="miracle-message-card" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.25);">
+                <!-- AI 코치 미라클 메시지 — missing-alert 아래, streak-mini 안 -->
+                <div id="coach-area" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.25);">
                     <div style="font-size:12px;font-weight:900;color:var(--gold);margin-bottom:5px;letter-spacing:0.3px;">✨ 미라클 메시지</div>
                     <div id="miracle-message-text" style="font-size:13px;font-weight:700;color:var(--navy);line-height:1.65;word-break:keep-all;"></div>
                 </div>
@@ -975,7 +975,7 @@ function onUserChange(){
 // ============================================================
 // AI 코치 미라클 메시지 로드 (멤버 변경 시에만 재호출)
 async function fetchMiracleMessage(name){
-    const card=document.getElementById('miracle-message-card');
+    const card=document.getElementById('coach-area');
     const text=document.getElementById('miracle-message-text');
     if(!card||!text) return;
     // 사랑주니(운영자) 제외
