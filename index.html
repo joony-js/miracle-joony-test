@@ -185,11 +185,6 @@
 
         /* MISC */
         .footer-note { font-size:15px;color:var(--navy);text-align:center;margin-top:10px;font-weight:900;line-height:1.5; }
-        /* AI 코치 — 미라클 메시지 */
-        .miracle-message-card { background:linear-gradient(135deg,#f0f4ff,#e8f0fe);border:1.5px solid rgba(59,74,107,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;position:relative;z-index:1; }
-        .miracle-message-title { font-size:13px;font-weight:900;color:#3b4a6b;margin-bottom:8px;letter-spacing:0.5px; }
-        .miracle-message-text { font-size:14px;font-weight:700;color:#3b4a6b;line-height:1.7;word-break:keep-all; }
-        .miracle-message-loading { font-size:13px;color:#8899bb;font-style:italic; }
         .personal-note { color:var(--navy);background:var(--gold-light);padding:11px 13px;border-radius:12px;margin-bottom:12px;font-size:14px;font-weight:700;border-left:4px solid var(--gold);text-align:center; }
         #toast { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:var(--gold);padding:14px 22px;border-radius:14px;font-size:14px;display:none;z-index:8000;font-weight:700;width:82%;text-align:center;border:1px solid rgba(241,196,15,0.28);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
@@ -211,7 +206,12 @@
         .pw-btn:active { opacity:0.85; }
         .pw-error { font-size:13px;color:var(--no);font-weight:800;margin-top:10px;min-height:18px; }
 
-        /* pw-change-box: 비밀번호 변경 기능 제거됨 */
+        /* 관리자 비밀번호 변경 */
+        .pw-change-box { background:var(--cream2);border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid var(--border); }
+        .pw-change-title { font-size:14px;font-weight:900;color:var(--navy);margin-bottom:12px; }
+        .pw-change-row { display:flex;gap:8px;align-items:center; }
+        .pw-change-input { flex:1;padding:12px;font-size:15px;font-weight:700;border:2px solid var(--border);border-radius:10px;background:#fff;color:var(--text); }
+        .pw-change-btn { padding:12px 16px;background:var(--navy);color:var(--gold);border:none;border-radius:10px;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap; }
     </style>
 </head>
 <body>
@@ -290,13 +290,8 @@
             <div class="streak-mini">
                 <div class="streak-main-line" id="streak-main-line">✨ 오늘 첫 기적을 시작해보세요!</div>
                 <div class="streak-sub-line"  id="streak-sub-line"></div>
-                <!-- 미기록 알림 -->
+                <!-- 4. 미기록 알림: streak-mini 안에 표시 -->
                 <div id="missed-alert-inline" class="missed-alert-box" style="display:none;margin-top:10px;"></div>
-                <!-- AI 코치 미라클 메시지 — missing-alert 아래, streak-mini 안 -->
-                <div id="coach-area" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(241,196,15,0.25);">
-                    <div style="font-size:12px;font-weight:900;color:var(--gold);margin-bottom:5px;letter-spacing:0.3px;">✨ 미라클 메시지</div>
-                    <div id="miracle-message-text" style="font-size:13px;font-weight:700;color:var(--navy);line-height:1.65;word-break:keep-all;"></div>
-                </div>
             </div>
 
             <div class="card">
@@ -527,7 +522,6 @@ let ALL_SEASONS=[]; // 전체 기수 목록 (동적 월 버튼용)
 let selectedDate=getTodayStr(), currentUser="", adminAuthed=false;
 let viewingPrevMonth=false, calMonth=CURRENT_MONTH, adminMonth=CURRENT_MONTH;
 let autoSaveDate={};
-let lastCoachMember=''; // 마지막으로 코치 메시지를 로드한 멤버명
 // appPassword 변수 제거 — APP_PASSWORD 상수 사용
 
 // ============================================================
@@ -715,7 +709,10 @@ function updateCountdown(){
 // 초기화
 // ============================================================
 function initUI(){
-    // quote-area sticky 제거됨 (전체 스크롤 방식 사용)
+    // 2. quote-area sticky 제거 — 헤더/명언 포함 전체 스크롤
+    // const hEl = document.querySelector('.header');
+    // const qEl = document.querySelector('.quote-area');
+    // if(hEl && qEl){ qEl.style.position='sticky'; qEl.style.top=hEl.offsetHeight+'px'; qEl.style.zIndex='899'; }
 
     // 기수설정 시트 기반: calMonth/adminMonth를 현재 기수 월로 리셋
     if(CURRENT_MONTH){ calMonth = CURRENT_MONTH; adminMonth = CURRENT_MONTH; }
@@ -959,7 +956,6 @@ function getFreeDayType(name,ds){
 // ============================================================
 function onUserChange(){
     const name=document.getElementById('userSelect').value; currentUser=name;
-    // lastCoachMember는 이름 비교로 판단하므로 별도 초기화 불필요
     if(name){
         const joinM=getMemberJoinMonth(name);
         if(calMonth<joinM) calMonth=joinM;
@@ -973,37 +969,6 @@ function onUserChange(){
 // ============================================================
 // 사용자 화면
 // ============================================================
-// AI 코치 미라클 메시지 로드 (멤버 변경 시에만 재호출)
-async function fetchMiracleMessage(name){
-    const card=document.getElementById('coach-area');
-    const text=document.getElementById('miracle-message-text');
-    if(!card||!text) return;
-    // 사랑주니(운영자) 제외
-    if(name==='사랑주니'){ card.style.display='none'; return; }
-    // 다른 멤버 선택 시에만 재호출 (lastCoachMember !== name)
-    if(lastCoachMember===name) return;
-    lastCoachMember=name; // 먼저 설정 (중복 호출 차단)
-    card.style.display='block';
-    text.innerHTML='<span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>';
-    try {
-        const res=await fetchWithTimeout(
-            API+"?type=coach&member="+encodeURIComponent(name)+"&v="+Date.now(), 15000
-        );
-        if(res.result==='success'&&res.message){
-            // 정상 메시지 표시
-            text.innerText=res.message;
-        } else if(res.result==='success'&&res.message===null){
-            // null 반환 (사랑주니 등) → 카드 숨김 (null 텍스트 방지)
-            card.style.display='none';
-        } else {
-            // 오류 또는 메시지 없음 → 기본 문구
-            text.innerText='오늘도 함께해요. 작은 실천이 기적을 만들어요. 💛';
-        }
-    } catch(e){
-        text.innerText='오늘도 함께해요. 작은 실천이 기적을 만들어요. 💛';
-    }
-}
-
 function loadUser(){
     const name=currentUser; if(!name||!MEMBERS[name]) return;
     document.getElementById('userArea').style.display='block';
@@ -1011,16 +976,15 @@ function loadUser(){
     // H열 noteDisplay 우선 표시, 없으면 G열 note 사용
     const noteText = MEMBERS[name].noteDisplay || MEMBERS[name].note || "없음";
     document.getElementById('personal-note').innerText="📌 "+name+"님의 개인 수칙: "+noteText;
-    checkMissingAlert(name);
+    checkMissingAlert(name); // 4. 미기록 알림
     calcStats(name);
     renderRoutineList(name);
     renderBadges(name);
     autoSaveFreeDay(name);
+    // 2. updateMyRank 호출 제거
     const badgeCard=document.getElementById('home-badge-card');
     if(badgeCard) badgeCard.style.display='block';
     renderTodayRoutineChart();
-    // AI 코치 미라클 메시지 (비동기, UI를 막지 않음)
-    fetchMiracleMessage(name);
 }
 
 // ============================================================
@@ -1249,7 +1213,8 @@ function renderRoutineList(name){
             // 4. partial 자유일도 O 버튼으로 통일
             const isO=(s==='O'); // getter에서 ⭐→O 정규화
             html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">기상 자유</span></span><div class="btn-group"><button class="btn btn-auto-pass">자동패스</button><button class="btn O ${isO?'active':''}" onclick="save('${name}','${r}','${isO?'':'O'}')">O</button></div></div>`;
-
+        } else if(freeType==='info'&&r.startsWith('기상시간')){
+            html+=`<div class="item"><span class="item-name">${r} <span class="item-badge">주말 기상 자유</span></span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
         } else {
             html+=`<div class="item"><span class="item-name">${r}</span><div class="btn-group"><button class="btn O ${s==='O'?'active':''}" onclick="save('${name}','${r}','O')">O</button><button class="btn X ${s==='X'?'active':''}" onclick="save('${name}','${r}','X')">X</button><button class="btn P ${s==='-'?'active':''}" onclick="save('${name}','${r}','-')">-</button></div></div>`;
         }
@@ -1288,16 +1253,8 @@ async function save(name,routine,status){
 
 async function quickSave(name,routine,date,cur){
     const next=cur==='O'?'X':cur==='X'?'-':cur==='-'?'':'O';
-    // adminMonth 기준으로 올바른 pool 업데이트
-    if(adminMonth===CURRENT_MONTH){
-        db=db.filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
-        if(next!=='') db.push({date,name,routine,status:next});
-    } else {
-        // 과거월: dbCache 업데이트
-        if(!dbCache[adminMonth]) dbCache[adminMonth]=[];
-        dbCache[adminMonth]=dbCache[adminMonth].filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
-        if(next!=='') dbCache[adminMonth].push({date,name,routine,status:next});
-    }
+    db=db.filter(r=>!(r.name===name&&r.date===date&&r.routine===routine));
+    if(next!=='') db.push({date,name,routine,status:next});
     renderAdmin();
     fetch(API,{method:'POST',mode:'no-cors',body:JSON.stringify({date,name,routine,status:next})});
 }
