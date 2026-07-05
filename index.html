@@ -978,34 +978,44 @@ function onUserChange(){
 // 사용자 화면
 // ============================================================
 // AI 코치 미라클 메시지 로드 (멤버 변경 시에만 재호출)
+// 미라클 메시지 로딩 점 애니메이션 interval (중복 방지용 전역)
+let dotInterval = null;
+
 async function fetchMiracleMessage(name){
     const card=document.getElementById('coach-area');
     const text=document.getElementById('miracle-message-text');
     if(!card||!text) return;
-    // 사랑주니(운영자) 제외
     if(name==='사랑주니'){ card.style.display='none'; return; }
-    // 다른 멤버 선택 시에만 재호출 (lastCoachMember !== name)
     if(lastCoachMember===name) return;
-    lastCoachMember=name; // 먼저 설정 (중복 호출 차단)
-    // 10. 멤버 변경 시 이전 문구 즉시 지우고 로딩 표시
+    lastCoachMember=name;
     text.innerText='';
     card.style.display='block';
-    text.innerHTML='<span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>';
+
+    // 기존 interval 제거 후 새로 생성 (중복 방지)
+    if(dotInterval) clearInterval(dotInterval);
+    let dotCount=1;
+    const BASE='미라클 메시지 불러오는 중';
+    text.innerHTML=`<span class="miracle-message-loading">${BASE} ·</span>`;
+    dotInterval=setInterval(()=>{
+        dotCount=dotCount>=5?1:dotCount+1;
+        const dots=' ·'.repeat(dotCount);
+        text.innerHTML=`<span class="miracle-message-loading">${BASE}${dots}</span>`;
+    },500);
+
     try {
         const res=await fetchWithTimeout(
             API+"?type=coach&member="+encodeURIComponent(name)+"&v="+Date.now(), 15000
         );
+        clearInterval(dotInterval); dotInterval=null; // 로딩 완료 → 애니메이션 멈춤
         if(res.result==='success'&&res.message){
-            // 정상 메시지 표시
             text.innerText=res.message;
         } else if(res.result==='success'&&res.message===null){
-            // null 반환 (사랑주니 등) → 카드 숨김 (null 텍스트 방지)
             card.style.display='none';
         } else {
-            // 오류 또는 메시지 없음 → 기본 문구
             text.innerText='오늘도 함께해요. 작은 실천이 기적을 만들어요. 💛';
         }
     } catch(e){
+        clearInterval(dotInterval); dotInterval=null;
         text.innerText='오늘도 함께해요. 작은 실천이 기적을 만들어요. 💛';
     }
 }
