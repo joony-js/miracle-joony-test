@@ -96,7 +96,7 @@
         .stat-val { font-size:16px;font-weight:900;color:var(--gold-dim); }
         .stat-lbl { font-size:10px;font-weight:700;color:var(--text-sub);margin-top:2px; }
 
-        .praise-text { text-align:center;font-size:15px;font-weight:900;padding:11px;border-radius:12px;margin-bottom:12px;background:var(--gold-light);border:1.5px solid var(--gold);color:var(--navy); }
+        /* praise-text CSS 제거 — AI 코치 미라클 메시지로 대체 */
 
         .streak-mini { background:var(--cream);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;border:2px solid var(--gold);box-shadow:0 2px 10px rgba(241,196,15,0.15);position:relative;z-index:1; }
         .streak-main-line { font-size:18px;font-weight:900;color:var(--navy);margin-bottom:2px; }
@@ -307,7 +307,7 @@
                     <div class="stat-box"><div class="stat-val" id="stat-record">0%</div><div class="stat-lbl">기록률</div></div>
                     <div class="stat-box"><div class="stat-val" id="stat-pass">0</div><div class="stat-lbl">패스</div></div>
                 </div>
-                <div id="praise-text" class="praise-text" style="display:none;"></div>
+                <!-- praise-text 제거 — AI 코치 미라클 메시지로 대체 -->
                 <div id="routine-list"></div>
                 <div id="personal-note" class="personal-note" style="margin-top:12px;margin-bottom:0;"></div>
                 <div class="footer-note" id="footer-note-text">📢 자유일에도 실천하면 ⭐로 기록해 주세요!</div>
@@ -1199,14 +1199,7 @@ function calcStats(name){
     document.getElementById('stat-rate').innerText=rate+'%';
     document.getElementById('stat-record').innerText=recRate+'%';
     document.getElementById('stat-pass').innerText=P;
-    const p=document.getElementById('praise-text');
-    if(rate===0){ p.style.display='none'; }
-    else { p.style.display='block';
-        if(rate===100) p.innerText="🏆 완벽한 하루! 전설이 되고 있어요!";
-        else if(rate>=80) p.innerText="🔥 오늘도 굉장해요! 이 기세 그대로!";
-        else if(rate>=60) p.innerText="👍 잘 하고 있어요! 조금만 더!";
-        else p.innerText="🌱 괜찮아요, 오늘도 시작한 것만으로 충분해요";
-    }
+    // praise-text 제거 — AI 코치 미라클 메시지로 대체
     renderStreakMini(name);
 }
 
