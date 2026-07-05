@@ -899,8 +899,12 @@ function getLatestSAdmin(name,date,routine){
 // ============================================================
 function getRoutinesForDate(name, date){
     const history=ROUTINE_HISTORY[name];
-    // 히스토리 없으면 현재 멤버 시트 items 사용 (fallback)
-    if(!history||history.length===0) return MEMBERS[name]?.items||[];
+    // 9. 히스토리 없으면 멤버시트 items fallback; 둘 다 없으면 로그 후 빈배열
+    if(!history||history.length===0){
+        const items=MEMBERS[name]?.items;
+        if(!items||items.length===0) console.warn('[getRoutinesForDate] 루틴 없음:', name, date);
+        return items||[];
+    }
     const valid=[];
     history.forEach(h=>{
         const startOk=!h.startDate||date>=h.startDate;
@@ -983,6 +987,8 @@ async function fetchMiracleMessage(name){
     // 다른 멤버 선택 시에만 재호출 (lastCoachMember !== name)
     if(lastCoachMember===name) return;
     lastCoachMember=name; // 먼저 설정 (중복 호출 차단)
+    // 10. 멤버 변경 시 이전 문구 즉시 지우고 로딩 표시
+    text.innerText='';
     card.style.display='block';
     text.innerHTML='<span class="miracle-message-loading">미라클 메시지 불러오는 중...</span>';
     try {
@@ -1180,20 +1186,33 @@ function renderStreakMini(name){
 // ============================================================
 function calcStats(name){
     const today=getTodayStr(), m=viewingPrevMonth?PREV_MONTH:CURRENT_MONTH, days=getDays(m);
-    let O=0,X=0,P=0,recDays=0;
+    // 통일 기준: oCnt/totalCells
+    // totalCells = O + X + 과거빈값(미완수)
+    // 제외: 미래, 오늘빈값, 패스(-), 자유, BEFORE_START
+    let oCnt=0, totalCells=0, P=0, recDays=0;
+    const partialEntry=PARTIAL_FREE_ROUTINES[name];
+    const partialList=partialEntry?partialEntry.routines:[];
     for(let i=1;i<=days;i++){
-        const ds=dateStr(m,i); if(!viewingPrevMonth&&ds>today) break;
+        const ds=dateStr(m,i);
+        if(ds>today) break; // 미래 제외
+        const freeType=getFreeDayType(name,ds);
         let hasEntry=false;
-        // 루틴히스토리 기반 해당 날짜 루틴 조회
         getRoutinesForDate(name,ds).forEach(r=>{
-            const s=getLatestS(name,ds,r); if(s==='BEFORE_START') return;
-            if(s==='O'){O++;hasEntry=true;}
-            if(s==='X'){X++;hasEntry=true;}
-            if(s==='-'){P++;hasEntry=true;}
+            const s=getLatestS(name,ds,r);
+            if(s==='BEFORE_START') return; // 제외
+            // 자유 루틴 제외
+            const isFreeR=(freeType==='full')||(freeType==='partial'&&partialList.includes(r));
+            if(isFreeR) return;
+            if(s==='-'){P++;hasEntry=true;return;} // 패스 제외 from rate
+            if(s==='O'){oCnt++;totalCells++;hasEntry=true;}
+            else if(s==='X'){totalCells++;hasEntry=true;} // X: 과거/오늘 모두 미완수
+            else if(s===''&&ds<today){totalCells++;} // 과거 빈값 = 미완수
+            // 오늘 빈값 제외 (아직 진행 중), 오늘 X는 위에서 이미 포함
         });
         if(hasEntry) recDays++;
     }
-    const rate=(O+X)>0?Math.round(O/(O+X)*100):0;
+    // 6. 0/0 방어: totalCells=0이면 0%
+    const rate=(totalCells>0)?Math.round(oCnt/totalCells*100):0;
     const todayDay=viewingPrevMonth?days:Math.min(new Date(today).getDate(),days);
     const recRate=todayDay>0?Math.round(recDays/todayDay*100):0;
     document.getElementById('stat-rate').innerText=rate+'%';
@@ -1491,31 +1510,47 @@ function renderAdmin(){
                 h+=`<td class="${cl} ${idx===0?dc:''}" style="background:${bg}" ${oc}>${disp||''}</td>`;
             }
             if(idx===0){
-                // 주차별 소결: 날짜별 유효 루틴 기준
+                // 주차별 소결 — 통일 기준 (oCnt/totalCells, 과거빈값=미완수)
                 wRanges.forEach(w=>{
                     let wO=0,wT=0;
                     for(let i=w.start;i<=w.end;i++){
-                        const ds=dateStr(m,i); if(ds>today) continue;
+                        const ds=dateStr(m,i);
+                        if(ds>today) continue; // 미래 제외
+                        const wFreeType=getFreeDayType(n,ds);
                         getRoutinesForDate(n,ds).forEach(rt=>{
                             const st=getLatestSAdmin(n,ds,rt);
-                            if(st==='O') wO++;
-                            if(st==='O'||st==='X') wT++;
+                            if(st==='BEFORE_START') return;
+                            const isWFree=(wFreeType==='full')||(wFreeType==='partial'&&(PARTIAL_FREE_ROUTINES[n]?.routines||[]).includes(rt));
+                            if(isWFree||st==='-') return; // 자유/패스 제외
+                            // 8. 오늘 빈값 완전 제외
+                            if(ds===today&&st==='') return;
+                            if(st==='O'){wO++;wT++;}
+                            else if(st==='X'){wT++;}
+                            else if(st===''&&ds<today){wT++;} // 과거빈값=미완수
                         });
                     }
-                    h+=`<td class="week-col" rowspan="${routines.length}">${wT>0?Math.round(wO/wT*100)+'%':'-'}</td>`;
+                    // 1. 0/0 방어: wT=0이면 0%
+                    h+=`<td class="week-col" rowspan="${routines.length}">${wT>0?Math.round(wO/wT*100)+'%':'0%'}</td>`;
                 });
-                // 성취율: 날짜별 유효 루틴 기준
+                // 성취율 — 통일 기준 (oCnt/totalCells, 과거빈값=미완수)
                 let mO=0,mV=0;
                 for(let i=1;i<=days;i++){
                     const ds=dateStr(m,i);
+                    if(ds>today) continue; // 미래 제외
+                    const mFreeType=getFreeDayType(n,ds);
                     getRoutinesForDate(n,ds).forEach(it=>{
                         const st=getLatestSAdmin(n,ds,it);
                         if(st==='BEFORE_START') return;
-                        if(st==='O') mO++;
-                        if(st==='O'||st==='X') mV++;
+                        const isMFree=(mFreeType==='full')||(mFreeType==='partial'&&(PARTIAL_FREE_ROUTINES[n]?.routines||[]).includes(it));
+                        if(isMFree||st==='-') return; // 자유/패스 제외
+                        if(ds===today&&st==='') return; // 오늘 빈값 제외
+                        if(st==='O'){mO++;mV++;}
+                        else if(st==='X'){mV++;}
+                        else if(st===''&&ds<today){mV++;} // 과거빈값=미완수
                     });
                 }
-                h+=`<td rowspan="${routines.length}" class="${dc}" style="font-weight:900;font-size:12px;background:var(--cream2);">${mV>0?Math.round(mO/mV*100):0}%</td>`;
+                // 7. 0/0 방어: mV=0이면 0%
+                h+=`<td rowspan="${routines.length}" class="${dc}" style="font-weight:900;font-size:12px;background:var(--cream2);">${(mV>0)?Math.round(mO/mV*100):0}%</td>`;
             }
             h+='</tr>';
         });
@@ -1667,9 +1702,13 @@ function renderMonthlyFlowChart(name){
     monthItems.forEach(r=>{monthCount[r]=0;weekXCount[r]=0;});
     for(let i=1;i<=_mdays;i++){
         const ds=dateStr(CURRENT_MONTH,i); if(ds>today) break;
-        // 날짜별 유효 루틴으로 조회
+        // 달력탭 — 통일 기준 (자유/패스/BEFORE_START 제외)
+        const mFlowFreeType=getFreeDayType(name,ds);
         getRoutinesForDate(name,ds).forEach(r=>{
             const s=getLatestS(name,ds,r);
+            if(s==='BEFORE_START') return;
+            const isMFlowFree=(mFlowFreeType==='full')||(mFlowFreeType==='partial'&&(PARTIAL_FREE_ROUTINES[name]?.routines||[]).includes(r));
+            if(isMFlowFree||s==='-') return; // 자유/패스 제외
             if(s==='O') monthCount[r]++;
             if(s==='X'&&ds>=weekStartStr) weekXCount[r]++;
         });
